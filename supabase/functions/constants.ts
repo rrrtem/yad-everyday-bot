@@ -9,8 +9,12 @@ export const DURATION_PENALTY_DAYS = 1;
 export const RESTORED_LIVES_AFTER_PENALTY = 2;
 
 // ID топиков (thread) для публичных напоминаний
+// ❗ Чтобы получить правильные ID:
+// 1. Создайте топики "Тексты" и "Картинки" в групповом чате
+// 2. Отправьте команду /get в каждый топик
+// 3. Обновите значения ниже на актуальные ID
 export const PUBLIC_REMINDER_THREAD_ID_TEXT = 2; // Топик для участников режима "тексты"  
-export const PUBLIC_REMINDER_THREAD_ID_IMAGE = 3; // Топик для участников режима "картинки"
+export const PUBLIC_REMINDER_THREAD_ID_IMAGE = 855; // Топик для участников режима "картинки"
 
 // Telegram ID владельца бота (установить актуальный ID)
 export const OWNER_TELEGRAM_ID = 149365895;
@@ -26,12 +30,12 @@ export const WEBHOOK_DEDUPLICATION_HOURS = 1;
 // ССЫЛКИ
 // =====================================================
 
-export const CHALLENGE_JOIN_LINK = "https://t.me/+-HiBq4KbXzgzNTc0"; 
+export const CHALLENGE_JOIN_LINK = "https://t.me/+vuamIyllbko2MjVk"; 
 
 // Ссылки на оплату
-export const DEFAULT_PAYMENT_URL = "https://pay.tribute.tg/standard";
-export const SPECIAL_PAYMENT_URL = "https://pay.tribute.tg/special";
-export const CANCEL_PAYMENT_URL = "https://pay.tribute.tg/cancel";
+export const DEFAULT_PAYMENT_URL = "https://t.me/tribute/app?startapp=svBt";
+export const SPECIAL_PAYMENT_URL = "https://t.me/tribute/app?startapp=suXB";
+export const CANCEL_PAYMENT_URL = "https://t.me/tribute";
 
 // =====================================================
 // РЕЖИМЫ И КОНФИГУРАЦИЯ УЧАСТИЯ
@@ -341,4 +345,19 @@ export const MSG_TRIBUTE_WEBHOOK_ERROR = `🚨 Ошибка обработки w
 export const MSG_TRIBUTE_SIGNATURE_ERROR = `🚨 Ошибка проверки подписи Tribute
 
 Получен webhook с некорректной подписью. Возможна попытка подмены данных.`;
+
+// =====================================================
+// СООБЩЕНИЯ: КОМАНДЫ СИНХРОНИЗАЦИИ
+// =====================================================
+
+export const MSG_SYNC_NO_ACTIVE_USERS = `ℹ️ Активных пользователей для синхронизации не найдено`;
+
+export const MSG_SYNC_COMPLETE = (checkedCount: number, expiredCount: number, restoredCount: number) => 
+`✅ Синхронизация завершена!
+📊 Проверено пользователей: ${checkedCount}
+⏰ Истекших подписок: ${expiredCount}
+🔄 Восстановлено подписок: ${restoredCount}`;
+
+export const MSG_SUBSCRIPTION_EXPIRED_NOTIFICATION = (expiresAt: string, daysLeft: number) => 
+`🔔 Ваша подписка истекла ${expiresAt}. ${daysLeft > 0 ? `У вас осталось ${daysLeft} ${pluralizeDays(daysLeft)} доступа.` : 'Доступ к премиум контенту приостановлен.'}`;
 

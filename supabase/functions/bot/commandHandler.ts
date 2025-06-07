@@ -1,8 +1,9 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendDirectMessage, findUserByTelegramId, registerUser } from "./userHandler.ts";
 import { MSG_START, MSG_GET_CHAT_ID, MSG_COMEBACK_RECEIVED, OWNER_TELEGRAM_ID } from "../constants.ts";
-import { dailyCron, publicDeadlineReminder } from "./cronHandler.ts";
+import { dailyCron, publicDeadlineReminder, allInfo } from "./cronHandler.ts";
 import { handleStartCommand, handlePromoCode } from "./startCommandHandler.ts";
+import { syncSubscriptionsCommand } from "./tributeApiHandler.ts";
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
@@ -142,6 +143,7 @@ export async function handleComebackCommand(message: any): Promise<void> {
  */
 export async function handleOwnerCommands(message: any): Promise<void> {
   const text = message.text || "";
+  console.log(`🔧 handleOwnerCommands called with text: "${text}"`);
   
   if (text === "/daily") {
     const res = await dailyCron();
@@ -177,8 +179,26 @@ export async function handleOwnerCommands(message: any): Promise<void> {
       report += `❌ Ошибка выполнения. Код: ${res.status}`;
     }
     await sendDirectMessage(message.from.id, report);
+  } else if (text === "/allinfo") {
+    const res = await allInfo();
+    let report = "Команда /allinfo выполнена:\n";
+    try {
+      const data = await res.json();
+      if (data.stats) {
+        report += `✅ Детальный отчет отправлен`;
+      } else {
+        report += `Статус: ${data.message || 'Неизвестно'}`;
+      }
+    } catch {
+      report += `❌ Ошибка выполнения. Код: ${res.status}`;
+    }
+    await sendDirectMessage(message.from.id, report);
   } else if (text === "/tribute_test") {
     await handleTributeTestCommand(message.from.id);
+  } else if (text === "/sync_subscriptions") {
+    await handleSyncSubscriptionsCommand(message.from.id);
+  } else if (text.startsWith("/test_webhook ")) {
+    await handleTestWebhookCommand(message.from.id, text);
   }
 }
 
@@ -208,4 +228,133 @@ async function handleTributeTestCommand(telegramId: number): Promise<void> {
   report += `\n📋 Один URL обрабатывает и Telegram, и Tribute webhook'и`;
   
   await sendDirectMessage(telegramId, report);
+}
+
+/**
+ * Синхронизация подписок с актуальным статусом (только для владельца)
+ */
+async function handleSyncSubscriptionsCommand(telegramId: number): Promise<void> {
+  await sendDirectMessage(telegramId, "🔄 Запускаю синхронизацию подписок...");
+  
+  try {
+    const result = await syncSubscriptionsCommand();
+    await sendDirectMessage(telegramId, result);
+  } catch (error) {
+    console.error("Error in sync subscriptions command:", error);
+    await sendDirectMessage(telegramId, `❌ Ошибка синхронизации: ${error.message}`);
+  }
+}
+
+/**
+ * Симуляция Tribute webhook'а (только для владельца)
+ * Использование: /test_webhook new_subscription 327223364
+ */
+async function handleTestWebhookCommand(telegramId: number, text: string): Promise<void> {
+  console.log(`🧪 handleTestWebhookCommand called for user ${telegramId} with text: "${text}"`);
+  const parts = text.split(" ");
+  
+  if (parts.length < 3) {
+    await sendDirectMessage(telegramId, `🧪 Симуляция Tribute webhook\n\nИспользование:\n/test_webhook new_subscription TELEGRAM_ID\n/test_webhook cancelled_subscription TELEGRAM_ID\n\nПример:\n/test_webhook new_subscription 327223364`);
+    return;
+  }
+  
+  const [, eventType, targetTelegramId] = parts;
+  const targetId = parseInt(targetTelegramId);
+  
+  if (!targetId || isNaN(targetId)) {
+    await sendDirectMessage(telegramId, "❌ Неверный telegram_id. Должно быть число.");
+    return;
+  }
+  
+  if (!["new_subscription", "cancelled_subscription"].includes(eventType)) {
+    await sendDirectMessage(telegramId, "❌ Неверный тип события. Используйте: new_subscription или cancelled_subscription");
+    return;
+  }
+  
+  await sendDirectMessage(telegramId, `🧪 Симулирую ${eventType} для пользователя ${targetId}...`);
+  
+  try {
+    // Создаем полноценный Tribute webhook в реальном формате
+    const now = new Date().toISOString();
+    
+    let webhookPayload: any;
+    
+    if (eventType === "new_subscription") {
+      webhookPayload = {
+        subscription_name: "Support my art 🌟",
+        subscription_id: 999999,
+        period_id: 888888, 
+        period: "monthly",
+        price: 500, // 5 евро в центах
+        amount: 500,
+        currency: "eur",
+        user_id: 777777,
+        telegram_user_id: targetId,
+        channel_id: 666666,
+        channel_name: "YAD Challenge Test",
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // +30 дней
+      };
+    } else {
+      webhookPayload = {
+        subscription_name: "Support my art 🌟",
+        subscription_id: 999999,
+        period_id: 888888,
+        period: "monthly", 
+        price: 500,
+        amount: 500,
+        currency: "eur",
+        user_id: 777777,
+        telegram_user_id: targetId,
+        channel_id: 666666,
+        channel_name: "YAD Challenge Test",
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // +7 дней
+        cancel_reason: "User cancelled subscription"
+      };
+    }
+    
+    // Создаем полный webhook в формате Tribute
+    const fullWebhook = {
+      created_at: now,
+      name: eventType,
+      payload: webhookPayload,
+      sent_at: now
+    };
+    
+    // Симулируем HTTP request к нашему webhook endpoint
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const webhookUrl = `${SUPABASE_URL}/functions/v1/bot`;
+    
+    // Создаем тестовую подпись (заглушка)
+    const testSignature = "test_signature_" + Math.random().toString(36).substring(7);
+    
+    const requestBody = JSON.stringify(fullWebhook);
+    
+    await sendDirectMessage(telegramId, `📡 Отправляю реалистичный webhook...\n\nURL: ${webhookUrl}\nТело: ${requestBody.substring(0, 200)}...`);
+    
+    // Отправляем webhook запрос
+    const result = await fetch(webhookUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "trbt-signature": testSignature,
+        "X-Test-Webhook": "true" // Маркер что это тестовый webhook
+      },
+      body: requestBody
+    });
+    
+    if (result) {
+      const resultData = await result.json();
+      const status = result.status;
+      
+      if (status === 200) {
+        await sendDirectMessage(telegramId, `✅ Webhook симулирован успешно!\n\nОтвет: ${JSON.stringify(resultData, null, 2)}`);
+      } else {
+        await sendDirectMessage(telegramId, `❌ Ошибка симуляции (${status}):\n\n${JSON.stringify(resultData, null, 2)}`);
+      }
+    }
+    
+  } catch (error) {
+    console.error("Error in test webhook command:", error);
+    await sendDirectMessage(telegramId, `❌ Ошибка выполнения симуляции: ${error.message}`);
+  }
 }

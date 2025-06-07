@@ -346,7 +346,7 @@
 - **MSG_DAILY_TO_GROUPCHAT** — Сообщение при отправке поста #daily в личку вместо группы
 - **MSG_PAUSE_REMOVED_BY_POST** — Сообщение при снятии с паузы из-за поста
 
-### Особенности обработки units_count
+#### Особенности обработки units_count
 - units_count увеличивается на 1 при каждом принятом посте с #daily
 - Не уменьшается при страйках или паузах
 - Используется для статистики участия пользователя
@@ -499,6 +499,7 @@
 - Условия для отправки напоминания пользователю:
   - in_chat = true (физически в чате)
   - is_active = true (активен в системе)
+  - pace = "daily" (ТОЛЬКО участники с ежедневным ритмом)
   - pause_until = null или пауза истекла (не на паузе)
   - public_remind = true (публичные напоминания не отключены вручную)
   - post_today = false (еще не прислал пост сегодня)
@@ -527,17 +528,13 @@
 2. Обновляем статус участия:
    - in_chat = true (пользователь физически в чате)
    - joined_at = now() (дата/время добавления в чат)
-   - left_at = null (сброс даты выхода, если была)
    - strikes_count = 0 (сброс страйков при входе в чат)
    - post_today = false
    - is_active = true если subscription_active = true ИЛИ subscription_days_left > 0 (активен при активной подписке или остатке дней)
    - updated_at = now()
 
 3. Если у пользователя были сохранённые дни подписки (subscription_days_left > 0):
-   - Проверяем валидность: если subscription_days_left <= 0, устанавливаем 0
-   - Отправляем MSG_WELCOME_BACK с информацией о возобновлении участия
    - Рассчитываем новую дату expires_at = now() + subscription_days_left дней
-   - subscription_days_left = 0 (дни использованы для возобновления)
    - subscription_active НЕ изменяется (управляется только через webhook Tribute)
 
 #### Константы для Б4:
@@ -569,21 +566,66 @@
    - Если subscription_days_left = 0 и expires_at > now() (дни привязаны к expires_at):
      - Рассчитываем subscription_days_left = количество дней между now() и expires_at
      - Отправляем MSG_LEFT_CHAT_DAYS_SAVED с информацией о сохранённых днях
-   - Если subscription_days_left = 0 и expires_at <= now():
+   
+   - Если subscription_days_left = 0 и во всех других случаях.
      - subscription_days_left остается 0
      - Отправляем MSG_LEFT_CHAT
+
 
 #### Константы для Б5:
 - **MSG_LEFT_CHAT** — Сообщение при выходе пользователя из чата (без сохранённых дней)
 - **MSG_LEFT_CHAT_DAYS_SAVED** — Сообщение при выходе пользователя с сохранением дней подписки
 
 
-### Б6. Вебхук API Tribute прислал отмену подписки
+### Б6. Вебхук API Tribute прислал новую подписку
+**Триггер:** Вебхук new_subscription от Tribute API
+
+**Дедупликация:** Проверяем поле `tribute_webhook_processed_at` - если webhook уже обработан недавно (в течение 5 минут), игнорируем запрос. Это защита только от спама, а не от обновления данных. Тестовые webhook'и обходят дедупликацию.
+
+1. Находим пользователя в БД (по telegram_user_id из вебхука, сопоставляем с telegram_id)
+   - Если найдено несколько записей с одним telegram_id — используем первую найденную и уведомляем админа о дубликатах
+   - Если пользователь не найден, создаём новую запись с базовыми данными (значит пользователь оплатил подписку напрямую через Tribute, минуя регистрацию в боте)
+
+2. Обновляем данные подписки из вебхука:
+   - subscription_id = значение из вебхука  
+   - period_id = значение из вебхука
+   - period = значение из вебхука (например, "monthly")
+   - price = значение из вебхука
+   - amount = значение из вебхука
+   - currency = значение из вебхука
+   - subscription_name = значение из вебхука
+   - channel_id = значение из вебхука
+   - channel_name = значение из вебхука
+   - expires_at = значение из вебхука
+   - subscription_started_at = now()
+   - subscription_cancelled_at = null (сброс при новой подписке)
+   - subscription_active = true (подписка активна)
+   - tribute_webhook_processed_at = now() (отмечаем время обработки webhook)
+   - updated_at = now()
+
+3. Если есть сохранённые дни подписки (subscription_days_left > 0):
+   - Прибавляем сохранённые дни к новой подписке: expires_at = expires_at + subscription_days_left дней
+   - subscription_days_left = 0 (дни использованы)
+   - Отправляем MSG_SUBSCRIPTION_RENEWED_WITH_BONUS
+
+4. Если сохранённых дней нет:
+   - Отправляем MSG_SUBSCRIPTION_RENEWED
+
+#### Константы для Б6:
+- **MSG_SUBSCRIPTION_RENEWED** — Подтверждение обновления подписки
+- **MSG_SUBSCRIPTION_RENEWED_WITH_BONUS** — Подтверждение обновления подписки с добавлением сохранённых дней
+
+#### Общие константы для Tribute API:
+- **WEBHOOK_DEDUPLICATION_HOURS** — Время дедупликации webhook'ов в часах (например, 1)
+
+### Б7. Вебхук API Tribute прислал отмену подписки
 **Триггер:** Вебхук cancelled_subscription от Tribute API
 
-**Дедупликация:** Проверяем поле `tribute_webhook_processed_at` - если webhook уже обработан недавно (в течение 1 часа), игнорируем запрос.
+**Дедупликация:** Проверяем поле `tribute_webhook_processed_at` - если webhook уже обработан недавно (в течение 5 минут), игнорируем запрос. Это защита только от спама, а не от обновления данных. Тестовые webhook'и обходят дедупликацию.
 
 1. Находим пользователя в БД (по telegram_user_id из вебхука)
+   - Если найдено несколько записей с одним telegram_id — используем первую найденную и уведомляем админа о дубликатах
+   - Если пользователь не найден, создаём новую запись с базовыми данными (для случаев когда webhook отмены приходит раньше webhook создания)
 
 2. Рассчитываем неиспользованные дни:
    - Если expires_at > now():
@@ -608,48 +650,10 @@
 
 5. Автоматическое удаление из чата произойдёт при истечении expires_at через dailyCron
 
-#### Константы для Б6:
+#### Константы для Б7:
 - **MSG_SUBSCRIPTION_CANCELLED** — Сообщение при отмене подписки через Tribute
 
-### Б7. Вебхук API Tribute прислал новую подписку
-**Триггер:** Вебхук new_subscription от Tribute API
 
-**Дедупликация:** Проверяем поле `tribute_webhook_processed_at` - если webhook уже обработан недавно (в течение 1 часа), игнорируем запрос.
-
-1. Находим пользователя в БД (по telegram_user_id из вебхука, сопоставляем с telegram_id)
-
-2. Обновляем данные подписки из вебхука:
-   - subscription_id = значение из вебхука  
-   - period_id = значение из вебхука
-   - period = значение из вебхука (например, "monthly")
-   - price = значение из вебхука
-   - amount = значение из вебхука
-   - currency = значение из вебхука
-   - subscription_name = значение из вебхука
-   - channel_id = значение из вебхука
-   - channel_name = значение из вебхука
-   - expires_at = значение из вебхука
-   - subscription_started_at = now()
-   - subscription_cancelled_at = null (сброс при новой подписке)
-   - subscription_active = true (подписка активна)
-   - is_active = true если in_chat = true (обновляем общий статус)
-   - tribute_webhook_processed_at = now() (отмечаем время обработки webhook)
-   - updated_at = now()
-
-3. Если есть сохранённые дни подписки (subscription_days_left > 0):
-   - Прибавляем сохранённые дни к новой подписке: expires_at = expires_at + subscription_days_left дней
-   - subscription_days_left = 0 (дни использованы)
-   - Отправляем MSG_SUBSCRIPTION_RENEWED_WITH_BONUS
-
-4. Если сохранённых дней нет:
-   - Отправляем MSG_SUBSCRIPTION_RENEWED
-
-#### Константы для Б7:
-- **MSG_SUBSCRIPTION_RENEWED** — Подтверждение обновления подписки
-- **MSG_SUBSCRIPTION_RENEWED_WITH_BONUS** — Подтверждение обновления подписки с добавлением сохранённых дней
-
-### Общие константы для Tribute API:
-- **WEBHOOK_DEDUPLICATION_HOURS** — Время дедупликации webhook'ов в часах (например, 1)
 
 
 
@@ -665,11 +669,29 @@
     - /weekly — запускает функцию weeklyCron для тестирования
     - /remind — запускает функцию publicDeadlineReminder для тестирования
     - /allinfo — запускает функцию  allInfo
+    - /test_webhook — симуляция Tribute webhook'ов для тестирования (см. В3)
+  #### 3. Симуляция Tribute webhook'ов (/test_webhook)
+    - Команда: `/test_webhook [тип_события] [telegram_id]`
+    - Доступные типы событий:
+      - `new_subscription` — симуляция новой подписки
+      - `cancelled_subscription` — симуляция отмены подписки
+    - Примеры использования:
+      - `/test_webhook new_subscription 327223364`
+      - `/test_webhook cancelled_subscription 327223364`
+    - Команда создает тестовые данные payload и вызывает соответствующие функции обработки
+    - Используется для отладки webhook'ов без необходимости реальных покупок/отмен в Tribute
+    - Обходит проверку подписи и дедупликацию
 
 #### Константы для В:
 - **MSG_GET_CHAT_ID** — Текст для ответа на команду /get (выводит ID чата)
 - **OWNER_TELEGRAM_ID** — Telegram ID владельца бота для доступа к админским командам
 - **MAIN_CHAT_ID** — ID основного чата проекта (для удаления пользователей)
+
+
+
+
+
+
 
 
 

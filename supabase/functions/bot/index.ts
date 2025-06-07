@@ -10,7 +10,7 @@ import { handleStartCallbackQuery } from "./startCommandHandler.ts";
 import { dailyCron, publicDeadlineReminder } from "./cronHandler.ts";
 import { handleNewChatMember } from "./newChatMemberHandler.ts";
 import { handleLeftChatMember } from "./leftChatMemberHandler.ts";
-import { handleTributeWebhook } from "./tributeApiHandler.ts";
+import { handleTributeWebhook, syncSubscriptionsCommand } from "./tributeApiHandler.ts";
 import { OWNER_TELEGRAM_ID } from "../constants.ts";
 
 // Переменные окружения и API Telegram
@@ -155,11 +155,29 @@ Deno.serve(async (req) => {
     return new Response("Method Not Allowed", { status: 405 });
   }
 
-  // Проверяем, является ли это Tribute webhook (по наличию подписи)
+  // Логируем каждый POST запрос
+  const timestamp = new Date().toISOString();
+  console.log(`\n=== POST REQUEST ${timestamp} ===`);
+  console.log("URL:", req.url);
+  
+  // Логируем ключевые заголовки
+  const contentType = req.headers.get("content-type");
+  const userAgent = req.headers.get("user-agent");
   const tributeSignature = req.headers.get("trbt-signature");
+  
+  console.log("Content-Type:", contentType);
+  console.log("User-Agent:", userAgent);
+  console.log("Has trbt-signature:", !!tributeSignature);
   if (tributeSignature) {
-    console.log("=== TRIBUTE WEBHOOK DETECTED ===");
+    console.log("trbt-signature value:", tributeSignature);
+  }
+  
+  // Проверяем, является ли это Tribute webhook (по наличию подписи)
+  if (tributeSignature) {
+    console.log("🎯 TRIBUTE WEBHOOK DETECTED - routing to tributeApiHandler");
     return await handleTributeWebhook(req);
+  } else {
+    console.log("📱 TELEGRAM WEBHOOK DETECTED - processing as Telegram update");
   }
 
   let body;
@@ -209,7 +227,7 @@ Deno.serve(async (req) => {
         await handleComebackCommand(message);
       } else if (/\B#daily\b/i.test(text)) {
         await handleDailyPost(message);
-      } else if (chatType === "private" && message.from.id === OWNER_TELEGRAM_ID && ["/daily", "/remind", "/tribute_test"].includes(text)) {
+      } else if (chatType === "private" && message.from.id === OWNER_TELEGRAM_ID && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions"].includes(text) || text.startsWith("/test_webhook "))) {
         await handleOwnerCommands(message);
       } else if (chatType === "private" && text && !text.startsWith("/")) {
         // Обрабатываем текстовые сообщения в личке (промокоды)
