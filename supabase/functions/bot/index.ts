@@ -231,7 +231,7 @@ Deno.serve(async (req) => {
         await handleStatusCommand(message);
       } else if (/\B#daily\b/i.test(text)) {
         await handleDailyPost(message);
-      } else if (chatType === "private" && message.from.id === OWNER_TELEGRAM_ID && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions"].includes(text) || text.startsWith("/test_webhook "))) {
+      } else if (chatType === "private" && message.from.id === OWNER_TELEGRAM_ID && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions", "/slots", "/test_slots", "/close_slots"].includes(text) || text.startsWith("/test_webhook ") || text.startsWith("/open"))) {
         await handleOwnerCommands(message);
       } else if (chatType === "private" && text && !text.startsWith("/")) {
         // Обрабатываем текстовые сообщения в личке (промокоды)

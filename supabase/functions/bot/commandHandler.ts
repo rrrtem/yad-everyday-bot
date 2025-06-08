@@ -286,6 +286,14 @@ export async function handleOwnerCommands(message: any): Promise<void> {
     await handleSyncSubscriptionsCommand(message.from.id);
   } else if (text.startsWith("/test_webhook ")) {
     await handleTestWebhookCommand(message.from.id, text);
+  } else if (text.startsWith("/open")) {
+    await handleOpenSlotsCommand(message.from.id, text);
+  } else if (text === "/slots") {
+    await handleSlotsStatusCommand(message.from.id);
+  } else if (text === "/test_slots") {
+    await handleTestSlotsCommand(message.from.id);
+  } else if (text === "/close_slots") {
+    await handleCloseSlotsCommand(message.from.id);
   }
 }
 
@@ -443,5 +451,243 @@ async function handleTestWebhookCommand(telegramId: number, text: string): Promi
   } catch (error) {
     console.error("Error in test webhook command:", error);
     await sendDirectMessage(telegramId, `❌ Ошибка выполнения симуляции: ${error.message}`);
+  }
+}
+
+/**
+ * Обрабатывает команду /open[число] - установка количества доступных мест
+ * Только для владельца бота
+ */
+async function handleOpenSlotsCommand(telegramId: number, text: string): Promise<void> {
+  console.log(`🔓 handleOpenSlotsCommand called with text: "${text}"`);
+  
+  // Извлекаем число из команды
+  const match = text.match(/^\/open(\d+)$/);
+  
+  if (!match) {
+    await sendDirectMessage(telegramId, 
+      "❌ Неверный формат команды.\n\nИспользование: /open[число]\nПример: /open20 - установит 20 доступных мест");
+    return;
+  }
+  
+  const slotsToSet = parseInt(match[1]);
+  
+  if (slotsToSet <= 0) {
+    await sendDirectMessage(telegramId, "❌ Количество мест должно быть больше 0");
+    return;
+  }
+  
+  try {
+    // Импортируем SlotManager
+    const { SlotManager } = await import("./startCommand/flows/SlotManager.ts");
+    const { MSG_SLOTS_OPENED, MSG_SLOTS_STATUS } = await import("../constants.ts");
+    
+    await sendDirectMessage(telegramId, `🔄 Устанавливаю ${slotsToSet} доступных мест...`);
+    
+    // Устанавливаем количество слотов
+    await SlotManager.setAvailableSlots(slotsToSet, telegramId);
+    
+    // Получаем обновленную статистику
+    const stats = await SlotManager.getSlotStats();
+    
+    // Формируем отчет
+    let report = MSG_SLOTS_OPENED(slotsToSet) + '\n\n';
+    report += MSG_SLOTS_STATUS(stats.available, stats.total);
+    
+    await sendDirectMessage(telegramId, report);
+    
+    // Если есть пользователи в waitlist, уведомляем их
+    const waitlistProcessed = await processWaitlistUsers(slotsToSet);
+    
+    if (waitlistProcessed > 0) {
+      await sendDirectMessage(telegramId, 
+        `📨 Дополнительно: уведомлено ${waitlistProcessed} пользователей из списка ожидания`);
+    }
+    
+  } catch (error) {
+    console.error("Ошибка в handleOpenSlotsCommand:", error);
+    await sendDirectMessage(telegramId, `❌ Ошибка выполнения: ${error.message}`);
+  }
+}
+
+/**
+ * Обрабатывает пользователей из waitlist при открытии новых мест
+ */
+async function processWaitlistUsers(maxUsers: number): Promise<number> {
+  try {
+    // Получаем пользователей из waitlist
+    const { data: waitlistUsers, error: fetchError } = await supabase
+      .from("users")
+      .select("telegram_id, username, waitlist_position")
+      .eq("waitlist", true)
+      .order("waitlist_position", { ascending: true })
+      .limit(maxUsers);
+    
+    if (fetchError) {
+      throw fetchError;
+    }
+    
+    const usersToProcess = waitlistUsers || [];
+    
+    if (usersToProcess.length === 0) {
+      return 0;
+    }
+    
+    let successCount = 0;
+    
+    for (const user of usersToProcess) {
+      try {
+        // Убираем из waitlist
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({
+            waitlist: false,
+            waitlist_position: null,
+            waitlist_added_at: null,
+            user_state: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq("telegram_id", user.telegram_id);
+        
+        if (updateError) {
+          throw updateError;
+        }
+        
+        // Отправляем уведомление
+        const { MSG_WAITLIST_OPENED } = await import("../constants.ts");
+        await sendDirectMessage(user.telegram_id, MSG_WAITLIST_OPENED);
+        
+        // Запускаем процесс настройки
+        const { SetupProcess } = await import("./startCommand/states/SetupProcess.ts");
+        await SetupProcess.startModeSelection(user.telegram_id);
+        
+        successCount++;
+      } catch (error) {
+        console.error(`Ошибка обработки пользователя ${user.telegram_id}:`, error);
+      }
+    }
+    
+    return successCount;
+    
+  } catch (error) {
+    console.error("Ошибка в processWaitlistUsers:", error);
+    return 0;
+  }
+}
+
+/**
+ * Обрабатывает команду /slots - показ статуса доступных мест
+ * Только для владельца бота
+ */
+async function handleSlotsStatusCommand(telegramId: number): Promise<void> {
+  try {
+    const { SlotManager } = await import("./startCommand/flows/SlotManager.ts");
+    const { MSG_SLOTS_STATUS } = await import("../constants.ts");
+    
+    const stats = await SlotManager.getSlotStats();
+    const statusMessage = MSG_SLOTS_STATUS(stats.available, stats.total);
+    
+    // Получаем количество пользователей в waitlist
+    const { count: waitlistCount } = await supabase
+      .from("users")
+      .select("*", { count: "exact", head: true })
+      .eq("waitlist", true);
+    
+    let report = statusMessage;
+    
+    if (waitlistCount && waitlistCount > 0) {
+      report += `\n⏳ Пользователей в списке ожидания: ${waitlistCount}`;
+    }
+    
+    report += '\n\n💡 Команды:\n';
+    report += '• /open[число] - установить количество мест\n';
+    report += '• /close_slots - закрыть все места (waitlist режим)\n';
+    report += '• /slots - показать текущий статус';
+    
+    await sendDirectMessage(telegramId, report);
+    
+  } catch (error) {
+    console.error("Ошибка в handleSlotsStatusCommand:", error);
+    await sendDirectMessage(telegramId, `❌ Ошибка получения статуса: ${error.message}`);
+  }
+}
+
+/**
+ * Обрабатывает команду /test_slots для тестирования системы слотов
+ */
+async function handleTestSlotsCommand(telegramId: number): Promise<void> {
+  try {
+    const { SlotManager } = await import("./startCommand/flows/SlotManager.ts");
+    
+    let report = "🧪 Тестирование системы слотов:\n\n";
+    
+    // Тест 1: Получение доступных слотов
+    try {
+      const availableSlots = await SlotManager.getAvailableSlots();
+      report += `✅ getAvailableSlots(): ${availableSlots}\n`;
+    } catch (error) {
+      report += `❌ getAvailableSlots(): ${error.message}\n`;
+    }
+    
+    // Тест 2: Проверка hasAvailableSlots
+    try {
+      const hasSlots = await SlotManager.hasAvailableSlots();
+      report += `✅ hasAvailableSlots(): ${hasSlots}\n`;
+    } catch (error) {
+      report += `❌ hasAvailableSlots(): ${error.message}\n`;
+    }
+    
+    // Тест 3: Получение статистики
+    try {
+      const stats = await SlotManager.getSlotStats();
+      report += `✅ getSlotStats(): available=${stats.available}, total=${stats.total}\n`;
+    } catch (error) {
+      report += `❌ getSlotStats(): ${error.message}\n`;
+    }
+    
+    // Тест 4: Проверка waitlist логики
+    try {
+      const { WaitlistFlow } = await import("./startCommand/flows/WaitlistFlow.ts");
+      const shouldWaitlist = await WaitlistFlow.shouldAddToWaitlist();
+      report += `✅ shouldAddToWaitlist(): ${shouldWaitlist}\n`;
+    } catch (error) {
+      report += `❌ shouldAddToWaitlist(): ${error.message}\n`;
+    }
+    
+    report += "\n💡 Если есть ошибки, вероятно нужно выполнить SQL миграцию slots_system_migration.sql";
+    
+    await sendDirectMessage(telegramId, report);
+    
+  } catch (error) {
+    console.error("Ошибка в handleTestSlotsCommand:", error);
+    await sendDirectMessage(telegramId, `❌ Ошибка тестирования: ${error.message}`);
+  }
+}
+
+/**
+ * Обрабатывает команду /close_slots для закрытия доступных мест
+ */
+async function handleCloseSlotsCommand(telegramId: number): Promise<void> {
+  try {
+    const { SlotManager } = await import("./startCommand/flows/SlotManager.ts");
+    const { MSG_SLOTS_CLOSED, MSG_SLOTS_STATUS } = await import("../constants.ts");
+    
+    await sendDirectMessage(telegramId, "🔄 Закрываю все доступные места...");
+    
+    // Закрываем все места
+    await SlotManager.closeAllSlots(telegramId);
+    
+    // Получаем обновленную статистику
+    const stats = await SlotManager.getSlotStats();
+    
+    // Формируем отчет
+    let report = MSG_SLOTS_CLOSED + '\n\n';
+    report += MSG_SLOTS_STATUS(stats.available, stats.total);
+    
+    await sendDirectMessage(telegramId, report);
+    
+  } catch (error) {
+    console.error("Ошибка в handleCloseSlotsCommand:", error);
+    await sendDirectMessage(telegramId, `❌ Ошибка закрытия мест: ${error.message}`);
   }
 }

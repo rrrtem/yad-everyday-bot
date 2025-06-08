@@ -3,6 +3,7 @@ import { NewUserFlow } from "./flows/NewUserFlow.ts";
 import { ReturningUserFlow } from "./flows/ReturningUserFlow.ts";
 import { ContinueSetupFlow } from "./flows/ContinueSetupFlow.ts";
 import { ActiveUserFlow } from "./flows/ActiveUserFlow.ts";
+import { WaitlistFlow } from "./flows/WaitlistFlow.ts";
 import { UserAnalyzer } from "./UserAnalyzer.ts";
 
 /**
@@ -32,6 +33,10 @@ export async function handleStartCommand(message: any): Promise<void> {
       
     case 'returning_user':
       await ReturningUserFlow.handle(userContext);
+      break;
+      
+    case 'in_waitlist':
+      await WaitlistFlow.handle(userContext);
       break;
       
     default:

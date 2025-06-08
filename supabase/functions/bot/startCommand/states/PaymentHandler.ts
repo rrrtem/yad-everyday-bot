@@ -1,5 +1,6 @@
 import { sendDirectMessage, findUserByTelegramId } from "../../userHandler.ts";
 import { SetupProcess } from "./SetupProcess.ts";
+import { SlotManager } from "../flows/SlotManager.ts";
 import { 
   MSG_DIRECT_CHAT_LINK,
   MSG_LINK_CLUB,
@@ -116,6 +117,10 @@ export class PaymentHandler {
         updated_at: now
       })
       .eq("telegram_id", telegramId);
+      
+    // УБИРАЕМ уменьшение слотов отсюда - это должно происходить 
+    // при реальном входе в чат после оплаты
+    // await SlotManager.decreaseAvailableSlots();
   }
   
   /**

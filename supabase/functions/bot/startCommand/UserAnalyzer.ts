@@ -1,6 +1,6 @@
 import { findUserByTelegramId, registerUser, updateExistingUser } from "../userHandler.ts";
 
-export type FlowType = 'new_user' | 'active_user' | 'continue_setup' | 'returning_user';
+export type FlowType = 'new_user' | 'active_user' | 'continue_setup' | 'returning_user' | 'in_waitlist';
 
 export interface UserContext {
   telegramId: number;
@@ -63,17 +63,22 @@ export class UserAnalyzer {
       return 'active_user';
     }
     
-    // 2. Пользователь в процессе настройки
+    // 2. Пользователь в списке ожидания
+    if (user.waitlist === true || user.user_state === 'in_waitlist') {
+      return 'in_waitlist';
+    }
+    
+    // 3. Пользователь в процессе настройки
     if (user.user_state) {
       return 'continue_setup';
     }
     
-    // 3. Возвращающийся пользователь (уже был в чате)
+    // 4. Возвращающийся пользователь (уже был в чате)
     if (isReturningUser) {
       return 'returning_user';
     }
     
-    // 4. Новый пользователь (включая существующих в БД, но новых для чата)
+    // 5. Новый пользователь (включая существующих в БД, но новых для чата)
     return 'new_user';
   }
   

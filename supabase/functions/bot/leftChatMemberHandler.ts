@@ -92,6 +92,16 @@ export async function handleLeftChatMember(chatMemberUpdate: any): Promise<void>
   } else {
     console.log(`handleLeftChatMember: пользователь ${telegramId} (${user.first_name}) успешно обновлён - добровольный выход, сохранено дней: ${savedDays}`);
     
+    // Увеличиваем количество доступных слотов после выхода пользователя
+    try {
+      const { SlotManager } = await import("./startCommand/flows/SlotManager.ts");
+      const availableSlots = await SlotManager.increaseAvailableSlots();
+      console.log(`handleLeftChatMember: слот освобожден пользователем ${telegramId}, доступно мест: ${availableSlots}`);
+    } catch (slotError) {
+      console.error(`handleLeftChatMember: ошибка увеличения слотов:`, slotError);
+      // Не критичная ошибка, не прерываем выполнение
+    }
+    
     // Отправляем соответствующее сообщение пользователю
     await sendDirectMessage(telegramId, messageToSend);
   }

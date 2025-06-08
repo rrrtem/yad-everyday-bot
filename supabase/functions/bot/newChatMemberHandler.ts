@@ -98,6 +98,16 @@ export async function handleNewChatMember(chatMemberUpdate: any): Promise<void> 
     return;
   } else {
     console.log(`handleNewChatMember: пользователь ${telegramId} (${user.first_name}) успешно обновлён - статус: в чате`);
+    
+    // Уменьшаем количество доступных слотов после успешного входа в чат
+    try {
+      const { SlotManager } = await import("./startCommand/flows/SlotManager.ts");
+      const remainingSlots = await SlotManager.decreaseAvailableSlots();
+      console.log(`handleNewChatMember: слот занят пользователем ${telegramId}, осталось мест: ${remainingSlots}`);
+    } catch (slotError) {
+      console.error(`handleNewChatMember: ошибка уменьшения слотов:`, slotError);
+      // Не критичная ошибка, не прерываем выполнение
+    }
   }
   
   // Шаг 4: Получаем обновлённые данные пользователя и отправляем подробное сообщение о статусе
