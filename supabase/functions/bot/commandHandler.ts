@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendDirectMessage, findUserByTelegramId, registerUser, sendStatusMessageWithButtons } from "./userHandler.ts";
-import { MSG_START, MSG_GET_CHAT_ID, MSG_WELCOME_RETURNING, MSG_RESET_SUCCESS, OWNER_TELEGRAM_ID, MSG_CHAT_MEMBER_STATUS } from "../constants.ts";
-import { dailyCron, publicDeadlineReminder, allInfo } from "./cronHandler.ts";
+import { MSG_START, MSG_GET_CHAT_ID, MSG_WELCOME_RETURNING, MSG_RESET_SUCCESS, OWNER_TELEGRAM_ID, MSG_CHAT_MEMBER_STATUS } from "./constants.ts";
+import { dailyCron, publicDeadlineReminder, allInfo } from "./cronHandler/index.ts";
 import { handleStartCommand } from "./startCommand/index.ts";
 import { handlePromoCode } from "./startCommand/states/index.ts";
 import { syncSubscriptionsCommand } from "./tributeApiHandler.ts";

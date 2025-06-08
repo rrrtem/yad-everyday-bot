@@ -1,7 +1,7 @@
 import { UserContext } from "../UserAnalyzer.ts";
 import { sendDirectMessage } from "../../userHandler.ts";
 import { SetupProcess } from "../states/SetupProcess.ts";
-import { MSG_WELCOME } from "../../../constants.ts";
+import { MSG_WELCOME } from "../../constants.ts";
 import { WaitlistFlow } from "./WaitlistFlow.ts";
 
 /**

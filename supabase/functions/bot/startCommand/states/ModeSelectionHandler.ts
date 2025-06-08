@@ -1,7 +1,7 @@
 import { sendDirectMessage } from "../../userHandler.ts";
 import { SetupProcess } from "./SetupProcess.ts";
 import { PaymentHandler } from "./PaymentHandler.ts";
-import { AVAILABLE_PACES } from "../../../constants.ts";
+import { AVAILABLE_PACES } from "../../constants.ts";
 
 /**
  * Обработчик выбора режима пользователя

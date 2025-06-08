@@ -8,7 +8,7 @@ import {
   FREE_PROMO_DAYS,
   MSG_FREE_PROMO_SUCCESS,
   CHALLENGE_JOIN_LINK
-} from "../../../constants.ts";
+} from "../../constants.ts";
 
 /**
  * Обработчик промокодов

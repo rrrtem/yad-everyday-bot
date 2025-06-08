@@ -3,7 +3,7 @@ import { sendDirectMessage } from "../../userHandler.ts";
 import { SetupProcess } from "../states/SetupProcess.ts";
 import { 
   MSG_WELCOME_RETURNING
-} from "../../../constants.ts";
+} from "../../constants.ts";
 
 /**
  * Flow для возвращающихся пользователей

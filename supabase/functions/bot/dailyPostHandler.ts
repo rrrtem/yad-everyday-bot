@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findUserByTelegramId, registerUser, sendDirectMessage } from "./userHandler.ts";
-import { MSG_DAILY_ACCEPTED, MSG_PAUSE_REMOVED_BY_POST, MSG_DAILY_TO_GROUPCHAT } from "../constants.ts";
+import { MSG_DAILY_ACCEPTED, MSG_PAUSE_REMOVED_BY_POST, MSG_DAILY_TO_GROUPCHAT } from "./constants.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");

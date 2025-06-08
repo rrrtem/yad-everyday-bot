@@ -8,7 +8,7 @@ import {
   MSG_WELCOME,
   DEFAULT_PAYMENT_URL,
   SPECIAL_PAYMENT_URL
-} from "../../../constants.ts";
+} from "../../constants.ts";
 import { findUserByTelegramId } from "../../userHandler.ts";
 
 /**

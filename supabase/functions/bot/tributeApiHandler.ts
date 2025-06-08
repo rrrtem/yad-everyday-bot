@@ -12,7 +12,7 @@ import {
   OWNER_TELEGRAM_ID,
   CHALLENGE_JOIN_LINK,
   pluralizeDays
-} from "../constants.ts";
+} from "./constants.ts";
 
 // Инициализация Supabase клиента
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

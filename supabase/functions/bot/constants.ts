@@ -650,5 +650,4 @@ export const CALLBACK_HAVE_PROMO = "have_promo";
 
 // Callback data для кнопок статуса
 export const CALLBACK_TRIBUTE_BOT = "tribute_bot";
-export const CALLBACK_ADMIN_CONTACT = "admin_contact";
-
+export const CALLBACK_ADMIN_CONTACT = "admin_contact"; 

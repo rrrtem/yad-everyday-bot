@@ -3,7 +3,7 @@ import {
   MSG_PAYMENT_COND,
   MSG_PROMO,
   AVAILABLE_MODES
-} from "../../../constants.ts";
+} from "../../constants.ts";
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;

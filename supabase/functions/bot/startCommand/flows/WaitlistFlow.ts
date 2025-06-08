@@ -1,6 +1,6 @@
 import { UserContext } from "../UserAnalyzer.ts";
 import { sendDirectMessage } from "../../userHandler.ts";
-import { MSG_WAITLIST } from "../../../constants.ts";
+import { MSG_WAITLIST } from "../../constants.ts";
 import { SlotManager } from "./SlotManager.ts";
 
 /**

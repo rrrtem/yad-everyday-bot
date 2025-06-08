@@ -1,5 +1,5 @@
 import { sendDirectMessage } from "../../userHandler.ts";
-import { OWNER_TELEGRAM_ID, MSG_SLOTS_FILLED } from "../../../constants.ts";
+import { OWNER_TELEGRAM_ID, MSG_SLOTS_FILLED } from "../../constants.ts";
 
 /**
  * Менеджер для управления системой динамических слотов

@@ -7,11 +7,11 @@ import { updateUserFromChatMember } from "./userHandler.ts";
 import { handleDailyPost } from "./dailyPostHandler.ts";
 import { handleStartCommandWrapper, handleGetCommand, handleComebackCommand, handleResetCommand, handleStatusCommand, handleOwnerCommands, handleTextMessage } from "./commandHandler.ts";
 import { handleStartCallbackQuery } from "./startCommand/index.ts";
-import { dailyCron, publicDeadlineReminder } from "./cronHandler.ts";
+import { dailyCron, publicDeadlineReminder } from "./cronHandler/index.ts";
 import { handleNewChatMember } from "./newChatMemberHandler.ts";
 import { handleLeftChatMember } from "./leftChatMemberHandler.ts";
 import { handleTributeWebhook, syncSubscriptionsCommand } from "./tributeApiHandler.ts";
-import { OWNER_TELEGRAM_ID } from "../constants.ts";
+import { OWNER_TELEGRAM_ID } from "./constants.ts";
 
 // Переменные окружения и API Telegram
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
