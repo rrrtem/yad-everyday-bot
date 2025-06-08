@@ -20,7 +20,11 @@ export async function sendDirectMessage(telegramId: number, text: string): Promi
     const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: telegramId, text }),
+      body: JSON.stringify({ 
+        chat_id: telegramId, 
+        text,
+        parse_mode: "HTML"
+      }),
     });
     const respJson = await response.json();
     if (!respJson.ok) {
@@ -62,7 +66,6 @@ export async function registerUser(telegramUser: any) {
     first_name: telegramUser.first_name || null,
     last_name: telegramUser.last_name || null,
     username: telegramUser.username || null,
-    is_active: false,
     in_chat: false,
     subscription_active: false,
     club: false,
@@ -101,7 +104,6 @@ export async function registerUser(telegramUser: any) {
 
 /**
  * Обновляет данные существующего пользователя (имя, фамилия, username)
- * is_active остается как есть
  */
 export async function updateExistingUser(telegramId: number, telegramUser: any) {
   console.log("updateExistingUser called", telegramId, telegramUser);
@@ -182,23 +184,19 @@ export async function updateUserFromChatMember(chatMemberUpdate: any) {
     updateData.strikes_count = 0;
     updateData.post_today = false;
     
-    // is_active = true только если есть активная подписка
-    if (existingUser.subscription_active) {
-      updateData.is_active = true;
-    }
+    // ❌ УБИРАЕМ ОШИБОЧНОЕ ОБНУЛЕНИЕ subscription_days_left
+    // Сохраненные дни НЕ должны обнуляться при входе в чат!
+    // Они должны списываться постепенно в dailyCron
     
-    // Если есть сохранённые дни подписки, возобновляем
+    // Если есть сохранённые дни подписки, НО НЕ ОБНУЛЯЕМ ИХ!
     if (existingUser.subscription_days_left > 0) {
-      const daysToAdd = existingUser.subscription_days_left;
-      updateData.expires_at = new Date(Date.now() + daysToAdd * 24 * 60 * 60 * 1000).toISOString();
-      updateData.subscription_days_left = 0;
-      updateData.is_active = true;
-      // subscription_active НЕ изменяем - только через webhook Tribute
+      console.log(`🔄 Пользователь ${telegramId} входит в чат с ${existingUser.subscription_days_left} сохраненными днями - НЕ обнуляем их!`);
+      // НЕ устанавливаем expires_at - сохраненные дни обрабатываются в dailyCron
+      // НЕ обнуляем subscription_days_left - они должны списываться постепенно!
     }
   } else {
     // Пользователь покинул чат (Б5)
     updateData.in_chat = false;
-    updateData.is_active = false;
     updateData.left_at = now;
     
     // Рассчитываем и сохраняем неиспользованные дни

@@ -1,8 +1,9 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendDirectMessage, findUserByTelegramId, registerUser } from "./userHandler.ts";
-import { MSG_START, MSG_GET_CHAT_ID, MSG_COMEBACK_RECEIVED, OWNER_TELEGRAM_ID } from "../constants.ts";
+import { MSG_START, MSG_GET_CHAT_ID, MSG_WELCOME_RETURNING, MSG_RESET_SUCCESS, OWNER_TELEGRAM_ID, MSG_CHAT_MEMBER_STATUS } from "../constants.ts";
 import { dailyCron, publicDeadlineReminder, allInfo } from "./cronHandler.ts";
-import { handleStartCommand, handlePromoCode } from "./startCommandHandler.ts";
+import { handleStartCommand } from "./startCommand/index.ts";
+import { handlePromoCode } from "./startCommand/states/index.ts";
 import { syncSubscriptionsCommand } from "./tributeApiHandler.ts";
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
@@ -135,7 +136,93 @@ export async function handleGetCommand(message: any): Promise<void> {
  * Обрабатывает команду /comeback
  */
 export async function handleComebackCommand(message: any): Promise<void> {
-  await sendDirectMessage(message.from.id, MSG_COMEBACK_RECEIVED);
+  const telegramId = message.from.id;
+  
+  // Проверяем есть ли у пользователя сохранённые дни
+  const user = await findUserByTelegramId(telegramId);
+  const hasSavedDays = user && user.subscription_days_left > 0;
+  const daysLeft = user?.subscription_days_left || 0;
+  
+  await sendDirectMessage(telegramId, MSG_WELCOME_RETURNING(hasSavedDays, daysLeft));
+}
+
+/**
+ * Обрабатывает команду /reset - сбрасывает настройки пользователя
+ */
+export async function handleResetCommand(message: any): Promise<void> {
+  const telegramId = message.from.id;
+  
+  console.log(`handleResetCommand: сброс настроек для пользователя ${telegramId}`);
+  
+  try {
+    const now = new Date().toISOString();
+    
+    console.log(`handleResetCommand: начинаю сброс настроек для пользователя ${telegramId}`);
+    
+    // Сбрасываем поля процесса регистрации
+    const { error, data } = await supabase
+      .from("users")
+      .update({
+        user_state: null, // Основное поле - состояние пользователя
+        mode: null,
+        pace: null,
+        updated_at: now
+      })
+      .eq("telegram_id", telegramId);
+      
+    if (error) {
+      console.error("Ошибка при сбросе настроек пользователя:", error);
+      console.error("Детали ошибки:", error.message, error.details, error.hint);
+      await sendDirectMessage(telegramId, "Произошла ошибка при сбросе настроек. Попробуй еще раз или напиши @rrrtem");
+      return;
+    }
+    
+    console.log(`handleResetCommand: SQL запрос выполнен успешно для пользователя ${telegramId}`);
+    
+    // Очищаем состояние в Map (fallback для user_state)
+    userStates.delete(telegramId);
+    console.log(`handleResetCommand: состояние очищено в Map для пользователя ${telegramId}`);
+    
+    console.log(`handleResetCommand: настройки успешно сброшены для пользователя ${telegramId}`);
+    
+    // Отправляем подтверждение
+    await sendDirectMessage(telegramId, MSG_RESET_SUCCESS);
+    
+  } catch (error) {
+    console.error("Ошибка в handleResetCommand:", error);
+    await sendDirectMessage(telegramId, "Произошла ошибка при сбросе настроек. Попробуй еще раз или напиши @rrrtem");
+  }
+}
+
+/**
+ * Обрабатывает команду /status - показывает статус пользователя
+ */
+export async function handleStatusCommand(message: any): Promise<void> {
+  const telegramId = message.from.id;
+  
+  console.log(`handleStatusCommand: запрос статуса для пользователя ${telegramId}`);
+  
+  try {
+    // Получаем данные пользователя из БД
+    const user = await findUserByTelegramId(telegramId);
+    
+    if (!user) {
+      await sendDirectMessage(telegramId, "❌ Пользователь не найден в системе. Используй команду /start для регистрации.");
+      return;
+    }
+    
+    console.log(`handleStatusCommand: пользователь найден, формирую статус`);
+    
+    // Формируем и отправляем сообщение со статусом
+    const statusMessage = MSG_CHAT_MEMBER_STATUS(user);
+    await sendDirectMessage(telegramId, statusMessage);
+    
+    console.log(`handleStatusCommand: статус отправлен пользователю ${telegramId}`);
+    
+  } catch (error) {
+    console.error("Ошибка в handleStatusCommand:", error);
+    await sendDirectMessage(telegramId, "Произошла ошибка при получении статуса. Попробуй еще раз или напиши @rrrtem");
+  }
 }
 
 /**

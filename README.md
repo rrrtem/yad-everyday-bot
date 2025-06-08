@@ -34,6 +34,7 @@ supabase/
 
 ### Команды пользователей
 - `/start` - Регистрация и настройка участия
+- `/reset` - Сброс настроек и начало процесса заново
 - `/change_mode` - Смена режима (тексты/картинки) 
 - `/change_pace` - Смена ритма (ежедневно/еженедельно)
 - `/pause` - Взять каникулы (отпуск)
@@ -55,7 +56,7 @@ supabase/
 2. Настройте переменные окружения
 3. Разверните Edge Function:
    ```bash
-   supabase functions deploy bot
+   supabase && npx supabase functions deploy bot --project-ref bqtgrzauzqlodgipaisz
    ```
 4. Настройте webhook в Tribute Dashboard
 
@@ -78,6 +79,6 @@ supabase/
 - **Отмена подписки** - сохранение неиспользованных дней для будущего возвращения
 - **Проверка подписей** - защита от поддельных webhook'ов через HMAC-SHA256
 
-URL для webhook'а в Tribute: `https://your-project.supabase.co/functions/v1/bot`
+URL для webhook'а в Tribute: `https://bqtgrzauzqlodgipaisz.supabase.co/functions/v1/bot`
 
 Webhook'и от Tribute автоматически определяются по заголовку `trbt-signature` и обрабатываются тем же URL, что и Telegram webhook'и.

@@ -225,7 +225,6 @@ export async function handleNewSubscription(payload: TributeNewSubscriptionPaylo
         .from("users")
         .insert({
           telegram_id: telegram_user_id,
-          is_active: false,
           in_chat: false,
           subscription_active: false,
           club: false,
@@ -371,7 +370,6 @@ export async function handleCancelledSubscription(payload: TributeCancelledSubsc
         .from("users")
         .insert({
           telegram_id: telegram_user_id,
-          is_active: false,
           in_chat: false,
           subscription_active: false,
           club: false,
@@ -420,7 +418,6 @@ export async function handleCancelledSubscription(payload: TributeCancelledSubsc
       expires_at: payload.expires_at,
       subscription_active: false,
       subscription_days_left: subscriptionDaysLeft,
-      is_active: remainsActive,
       tribute_webhook_processed_at: now,
       updated_at: now
     };
@@ -468,12 +465,11 @@ export async function syncSubscriptionsCommand(): Promise<string> {
   try {
     console.log("=== SYNC SUBSCRIPTIONS COMMAND ===");
 
-    // Получаем всех активных пользователей в системе
-    // (is_active = true означает: in_chat = true И (subscription_active = true ИЛИ subscription_days_left > 0))
-    const { data: users, error: fetchError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("is_active", true);
+      // Получаем всех пользователей в чате (активных пользователей)
+  const { data: users, error: fetchError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("in_chat", true);
 
     if (fetchError) {
       console.error("Error fetching active subscribers:", fetchError);
@@ -502,7 +498,6 @@ export async function syncSubscriptionsCommand(): Promise<string> {
             .from("users")
             .update({
               subscription_active: false, // Команда админа может корректировать subscription_active
-              is_active: user.in_chat && daysLeft > 0,
               updated_at: now.toISOString()
             })
             .eq("id", user.id);

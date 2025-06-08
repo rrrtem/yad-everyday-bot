@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findUserByTelegramId, registerUser, sendDirectMessage } from "./userHandler.ts";
-import { MSG_WELCOME_BACK } from "../constants.ts";
+import { MSG_CHAT_MEMBER_STATUS } from "../constants.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -68,31 +68,23 @@ export async function handleNewChatMember(chatMemberUpdate: any): Promise<void> 
     updated_at: now.toISOString()
   };
   
-  // Определяем is_active на основе подписки
+  // Логика активности теперь основана только на нахождении в чате
+  console.log(`handleNewChatMember: пользователь ${telegramId} вошел в чат`);
   const hasActiveSubscription = existingUser.subscription_active === true;
   const hasSavedDays = (existingUser.subscription_days_left || 0) > 0;
+  console.log(`handleNewChatMember: subscription_active: ${hasActiveSubscription}, saved_days: ${existingUser.subscription_days_left}`);
   
-  if (hasActiveSubscription || hasSavedDays) {
-    updateData.is_active = true;
-    console.log(`handleNewChatMember: пользователь ${telegramId} становится активным (subscription_active: ${hasActiveSubscription}, saved_days: ${existingUser.subscription_days_left})`);
-  } else {
-    updateData.is_active = false;
-    console.log(`handleNewChatMember: пользователь ${telegramId} остается неактивным (нет подписки и сохранённых дней)`);
-  }
+  // ❌ УБИРАЕМ ОШИБОЧНОЕ ОБНУЛЕНИЕ subscription_days_left
+  // Сохраненные дни НЕ должны обнуляться при входе в чат!
+  // Они должны списываться постепенно в dailyCron
   
-  // Шаг 3: Если у пользователя были сохранённые дни подписки
+  // Шаг 3: Если у пользователя были сохранённые дни подписки  
   if (hasSavedDays) {
-    console.log(`handleNewChatMember: у пользователя ${telegramId} есть ${existingUser.subscription_days_left} сохранённых дней`);
+    console.log(`handleNewChatMember: у пользователя ${telegramId} есть ${existingUser.subscription_days_left} сохранённых дней - НЕ обнуляем их!`);
     
-    // Рассчитываем новую дату expires_at
-    const newExpiresAt = new Date(now.getTime() + existingUser.subscription_days_left * 24 * 60 * 60 * 1000);
-    updateData.expires_at = newExpiresAt.toISOString();
-    updateData.subscription_days_left = 0; // Используем сохранённые дни
-    
-    console.log(`handleNewChatMember: установлена новая дата окончания подписки: ${newExpiresAt.toISOString()}`);
-    
-    // Отправляем приветственное сообщение о возвращении
-    await sendDirectMessage(telegramId, MSG_WELCOME_BACK);
+    // НЕ устанавливаем expires_at - сохраненные дни обрабатываются в dailyCron
+    // НЕ обнуляем subscription_days_left - они должны списываться постепенно!
+    console.log(`handleNewChatMember: сохраненные дни будут списываться постепенно в dailyCron`);
   }
   
   // Обновляем данные в БД
@@ -103,7 +95,21 @@ export async function handleNewChatMember(chatMemberUpdate: any): Promise<void> 
     
   if (error) {
     console.error(`handleNewChatMember: ошибка обновления пользователя ${telegramId}:`, error.message);
+    return;
   } else {
-    console.log(`handleNewChatMember: пользователь ${telegramId} (${user.first_name}) успешно обновлён - статус: в чате, активен: ${updateData.is_active}`);
+    console.log(`handleNewChatMember: пользователь ${telegramId} (${user.first_name}) успешно обновлён - статус: в чате`);
+  }
+  
+  // Шаг 4: Получаем обновлённые данные пользователя и отправляем подробное сообщение о статусе
+  try {
+    const updatedUser = await findUserByTelegramId(telegramId);
+    if (updatedUser) {
+      const statusMessage = MSG_CHAT_MEMBER_STATUS(updatedUser);
+      await sendDirectMessage(telegramId, statusMessage);
+      console.log(`handleNewChatMember: отправлено сообщение о статусе пользователю ${telegramId}`);
+    }
+  } catch (statusError) {
+    console.error(`handleNewChatMember: ошибка отправки сообщения о статусе пользователю ${telegramId}:`, statusError);
+    // Не критичная ошибка, не прерываем выполнение
   }
 } 

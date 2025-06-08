@@ -5,8 +5,8 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import { updateUserFromChatMember } from "./userHandler.ts";
 import { handleDailyPost } from "./dailyPostHandler.ts";
-import { handleStartCommandWrapper, handleGetCommand, handleComebackCommand, handleOwnerCommands, handleTextMessage } from "./commandHandler.ts";
-import { handleStartCallbackQuery } from "./startCommandHandler.ts";
+import { handleStartCommandWrapper, handleGetCommand, handleComebackCommand, handleResetCommand, handleStatusCommand, handleOwnerCommands, handleTextMessage } from "./commandHandler.ts";
+import { handleStartCallbackQuery } from "./startCommand/index.ts";
 import { dailyCron, publicDeadlineReminder } from "./cronHandler.ts";
 import { handleNewChatMember } from "./newChatMemberHandler.ts";
 import { handleLeftChatMember } from "./leftChatMemberHandler.ts";
@@ -225,6 +225,10 @@ Deno.serve(async (req) => {
         await handleGetCommand(message);
       } else if (text === "/comeback") {
         await handleComebackCommand(message);
+      } else if (text === "/reset") {
+        await handleResetCommand(message);
+      } else if (text === "/status") {
+        await handleStatusCommand(message);
       } else if (/\B#daily\b/i.test(text)) {
         await handleDailyPost(message);
       } else if (chatType === "private" && message.from.id === OWNER_TELEGRAM_ID && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions"].includes(text) || text.startsWith("/test_webhook "))) {

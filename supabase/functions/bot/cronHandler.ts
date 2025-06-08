@@ -15,7 +15,8 @@ import {
   SUBSCRIPTION_REMINDER_DAYS,
   OWNER_TELEGRAM_ID,
   PUBLIC_REMINDER_THREAD_ID_TEXT,
-  PUBLIC_REMINDER_THREAD_ID_IMAGE
+  PUBLIC_REMINDER_THREAD_ID_IMAGE,
+  removeUserFromChatWithoutBan
 } from "../constants.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -32,6 +33,13 @@ if (!SUPABASE_URL || !SUPABASE_KEY || !TELEGRAM_BOT_TOKEN) {
 }
 
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/**
+ * Локальная обертка для удаления пользователя из чата БЕЗ бана
+ */
+async function removeUserFromChat(userId: number): Promise<void> {
+  await removeUserFromChatWithoutBan(userId, TELEGRAM_GROUP_CHAT_ID, TELEGRAM_BOT_TOKEN);
+}
 
 /**
  * Ежедневная проверка (dailyCron) - реализует логику Б2 из logic.md
@@ -62,7 +70,7 @@ export async function dailyCron(): Promise<Response> {
   console.log(`✅ Загружено ${users.length} записей пользователей из БД`);
   
   // Предварительная статистика пользователей
-  const activeUsers = users.filter(u => u.in_chat && u.is_active);
+  const activeUsers = users.filter(u => u.in_chat);
   const dailyUsers = activeUsers.filter(u => u.pace === "daily");
   const weeklyUsers = activeUsers.filter(u => u.pace === "weekly");
   const pausedUsers = users.filter(u => u.pause_until && new Date(u.pause_until) > now);
@@ -93,7 +101,7 @@ export async function dailyCron(): Promise<Response> {
 
   // 1. Проверка активных пользователей с ежедневным ритмом
   for (const user of users) {
-    if (user.in_chat && user.is_active && user.pace === "daily") {
+    if (user.in_chat && user.pace === "daily") {
       stats.totalActive++;
       
       if (user.post_today) {
@@ -159,17 +167,9 @@ export async function dailyCron(): Promise<Response> {
         // Пауза истекла
         if (user.strikes_count === 4) {
           console.log(`🚨 Удаляем пользователя ${user.username || user.telegram_id} из чата (4 страйка)`);
-          // Удаляем из чата
+          // Удаляем из чата с возможностью вернуться по invite ссылке
           try {
-            await fetch(`${TELEGRAM_API}/kickChatMember`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                chat_id: TELEGRAM_GROUP_CHAT_ID,
-                user_id: user.telegram_id
-              })
-            });
-            console.log(`✅ Пользователь ${user.username || user.telegram_id} удален из чата`);
+            await removeUserFromChat(user.telegram_id);
           } catch (err) {
             console.error(`❌ Ошибка удаления пользователя ${user.username || user.telegram_id}:`, err);
           }
@@ -178,7 +178,6 @@ export async function dailyCron(): Promise<Response> {
             .from("users")
             .update({
               in_chat: false,
-              is_active: false,
               strikes_count: 0,
               pause_started_at: null,
               pause_until: null,
@@ -218,28 +217,98 @@ export async function dailyCron(): Promise<Response> {
   // 3. Обработка подписок и subscription_days_left (остаток с прошлого сезона)
   console.log(`\n🔍 ФАЗА 3: Обработка subscription_days_left`);
   let subscriptionProcessed = 0;
+  const usersToRemove: number[] = []; // Список пользователей для удаления
+  
   for (const user of users) {
-    if (user.subscription_days_left > 0 && user.is_active && user.subscription_active === false) {
+    // ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ для диагностики проблемы с резким уменьшением дней
+    if (user.subscription_days_left > 0) {
+      console.log(`🔍 ДИАГНОСТИКА пользователя ${user.username || user.telegram_id}:`);
+      console.log(`   - subscription_days_left: ${user.subscription_days_left} (тип: ${typeof user.subscription_days_left})`);
+      console.log(`   - subscription_active: ${user.subscription_active} (тип: ${typeof user.subscription_active})`);
+      console.log(`   - in_chat: ${user.in_chat} (тип: ${typeof user.in_chat})`);
+      console.log(`   - updated_at: ${user.updated_at}`);
+      
+      // ПРОВЕРКА УСЛОВИЙ ФИЛЬТРАЦИИ
+      const condition1 = user.subscription_days_left > 0;
+      const condition2 = user.in_chat;
+      const condition3 = user.subscription_active === false;
+      const overallCondition = condition1 && condition2 && condition3;
+      
+      console.log(`   ПРОВЕРКА УСЛОВИЙ:`);
+      console.log(`   - subscription_days_left > 0: ${condition1}`);
+      console.log(`   - in_chat: ${condition2}`);
+      console.log(`   - subscription_active === false: ${condition3}`);
+      console.log(`   - ОБЩЕЕ УСЛОВИЕ (должно быть true для обработки): ${overallCondition}`);
+    }
+    
+    // 3.1. Обрабатываем пользователей с сохраненными днями (subscription_days_left > 0)
+    // Проверяем: НЕТ активной подписки (false, null или undefined)
+    const hasNoActiveSubscription = !user.subscription_active;
+    
+    if (user.subscription_days_left > 0 && user.in_chat && hasNoActiveSubscription) {
+      // ВРЕМЕННО ОТКЛЮЧАЕМ ЗАЩИТУ ОТ ПОВТОРНОГО ЗАПУСКА 
+      // Проблема: updated_at обновляется не только dailyCron, но и другими функциями
+      // TODO: Нужно добавить специальное поле last_daily_cron_processed_at
+      
+      console.log(`✅ ОБРАБАТЫВАЕМ ${user.username || user.telegram_id} (защита отключена для диагностики)`);
+      
+      // const lastUpdated = user.updated_at ? new Date(user.updated_at) : null;
+      // const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+      // 
+      // if (lastUpdated && lastUpdated >= twoHoursAgo) {
+      //   console.log(`⚠️ ПРОПУСКАЕМ ${user.username || user.telegram_id} - обновлен недавно (updated_at: ${user.updated_at}), возможно уже обработан в этом запуске`);
+      //   continue; // Пропускаем, если обрабатывали в последние 2 часа
+      // }
+      
       subscriptionProcessed++;
       const newDaysLeft = user.subscription_days_left - 1;
-      console.log(`📉 ${user.username || user.telegram_id}: ${user.subscription_days_left} -> ${newDaysLeft} дней`);
+      console.log(`📉 ОБРАБОТКА ${user.username || user.telegram_id}: ${user.subscription_days_left} -> ${newDaysLeft} дней`);
+      console.log(`🕐 Время обработки: ${now.toISOString()}`);
       
       if (newDaysLeft === SUBSCRIPTION_REMINDER_DAYS) {
         console.log(`⚠️ Отправляем напоминание ${user.username || user.telegram_id} (${newDaysLeft} дней осталось)`);
-        await sendDirectMessage(user.telegram_id, MSG_SUBSCRIPTION_ENDING_REMINDER);
+        const isClubMember = user.club || false;
+        await sendDirectMessage(user.telegram_id, MSG_SUBSCRIPTION_ENDING_REMINDER(isClubMember));
         stats.subscriptionWarnings.push({username: user.username || String(user.telegram_id), daysLeft: newDaysLeft});
+        
+        await supabase
+          .from("users")
+          .update({
+            subscription_days_left: newDaysLeft,
+            updated_at: now.toISOString()
+          })
+          .eq("telegram_id", user.telegram_id);
+          
+      } else if (newDaysLeft === 1) {
+        console.log(`🚨 Последний день подписки у ${user.username || user.telegram_id}`);
+        const isClubMember = user.club || false;
+        await sendDirectMessage(user.telegram_id, MSG_SUBSCRIPTION_EXPIRED(isClubMember));
+        stats.subscriptionWarnings.push({username: user.username || String(user.telegram_id), daysLeft: newDaysLeft});
+        
+        await supabase
+          .from("users")
+          .update({
+            subscription_days_left: newDaysLeft,
+            updated_at: now.toISOString()
+          })
+          .eq("telegram_id", user.telegram_id);
+          
       } else if (newDaysLeft === 0) {
-        console.log(`🚨 Подписка истекла у ${user.username || user.telegram_id}`);
-        await sendDirectMessage(user.telegram_id, MSG_SUBSCRIPTION_EXPIRED);
+        console.log(`🚨 Подписка закончилась у ${user.username || user.telegram_id} - добавляем в список для удаления`);
+        
+        // Обновляем данные и запоминаем для удаления (НЕ отправляем сообщение здесь!)
         await supabase
           .from("users")
           .update({
             expires_at: now.toISOString(),
-            is_active: false,
             subscription_days_left: 0,
             updated_at: now.toISOString()
           })
           .eq("telegram_id", user.telegram_id);
+          
+        // Добавляем в список для удаления (удалим после цикла)
+        usersToRemove.push(user.telegram_id);
+        
       } else {
         await supabase
           .from("users")
@@ -250,42 +319,53 @@ export async function dailyCron(): Promise<Response> {
           .eq("telegram_id", user.telegram_id);
       }
     }
-  }
-  console.log(`📊 Обработано подписок: ${subscriptionProcessed}`);
-
-  // 4. Удаление пользователей с истекшей подпиской
-  console.log(`\n🔍 ФАЗА 4: Удаление пользователей с истекшей подпиской`);
-  let expiredRemoved = 0;
-  for (const user of users) {
-    if (user.is_active && user.expires_at && new Date(user.expires_at) <= now && user.subscription_days_left === 0) {
-      expiredRemoved++;
-      console.log(`🚨 Удаляем ${user.username || user.telegram_id} (подписка истекла)`);
-      try {
-        await fetch(`${TELEGRAM_API}/kickChatMember`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chat_id: TELEGRAM_GROUP_CHAT_ID,
-            user_id: user.telegram_id
-          })
-        });
-        console.log(`✅ Пользователь ${user.username || user.telegram_id} удален из чата`);
-      } catch (err) {
-        console.error(`❌ Ошибка удаления пользователя ${user.username || user.telegram_id}:`, err);
-      }
+    
+    // 3.2. ДЫРКА В ЛОГИКЕ: Проверяем пользователей БЕЗ подписки И БЕЗ сохраненных дней
+    else if (user.in_chat && hasNoActiveSubscription && user.subscription_days_left === 0) {
+      console.log(`🚨 ДЫРКА В ЛОГИКЕ: ${user.username || user.telegram_id} в чате БЕЗ подписки И БЕЗ сохраненных дней - добавляем в список для удаления`);
       
+      // Обновляем expires_at для корректности данных
       await supabase
         .from("users")
         .update({
-          in_chat: false,
-          is_active: false,
+          expires_at: now.toISOString(),
           updated_at: now.toISOString()
         })
         .eq("telegram_id", user.telegram_id);
         
-      await sendDirectMessage(user.telegram_id, MSG_REMOVED_SUBSCRIPTION_EXPIRED);
-      stats.subscriptionRemoved.push({username: user.username || String(user.telegram_id)});
+      // Добавляем в список для удаления
+      usersToRemove.push(user.telegram_id);
     }
+  }
+  console.log(`📊 Обработано подписок: ${subscriptionProcessed}`);
+
+  // 4. Удаление пользователей с истекшей подпиской (сразу после обработки)
+  console.log(`\n🔍 ФАЗА 4: Удаление пользователей с истекшей подпиской`);
+  let expiredRemoved = 0;
+  
+  for (const telegramId of usersToRemove) {
+    const user = users.find(u => u.telegram_id === telegramId);
+    if (!user) continue;
+    
+    expiredRemoved++;
+    console.log(`🚨 Удаляем ${user.username || user.telegram_id} (подписка истекла, 0 дней осталось)`);
+    
+    try {
+      await removeUserFromChat(user.telegram_id);
+    } catch (err) {
+      console.error(`❌ Ошибка удаления пользователя ${user.username || user.telegram_id}:`, err);
+    }
+    
+    await supabase
+      .from("users")
+      .update({
+        in_chat: false,
+        updated_at: now.toISOString()
+      })
+      .eq("telegram_id", user.telegram_id);
+      
+    await sendDirectMessage(user.telegram_id, MSG_REMOVED_SUBSCRIPTION_EXPIRED);
+    stats.subscriptionRemoved.push({username: user.username || String(user.telegram_id)});
   }
   console.log(`📊 Удалено пользователей: ${expiredRemoved}`);
 
@@ -308,23 +388,18 @@ export async function dailyCron(): Promise<Response> {
     const username = user.username || String(user.telegram_id);
     
     // Участники с 3 страйками
-    if (user.strikes_count === 3 && user.is_active) {
+    if (user.strikes_count === 3 && user.in_chat) {
       stats.dangerousCases.push({
         username,
         reason: "3 страйка - на грани исключения"
       });
     }
     
-    // Участники с истекающей подпиской и страйками
-    if (user.subscription_days_left <= 3 && user.subscription_days_left > 0 && user.strikes_count > 0) {
-      stats.dangerousCases.push({
-        username,
-        reason: `Подписка истекает через ${user.subscription_days_left} дн. + ${user.strikes_count} страйк(а)`
-      });
-    }
+    // УБИРАЕМ АНАЛИЗ subscription_days_left ЗДЕСЬ, ПОСКОЛЬКУ ОН УЖЕ ОБРАБОТАН В ФАЗЕ 3
+    // И МОЖЕТ СОДЕРЖАТЬ УСТАРЕВШИЕ ДАННЫЕ!
     
-    // Новые неактивные пользователи (в чате, но без подписки)
-    if (user.in_chat && !user.is_active && user.created_at) {
+    // Новые неактивные пользователи (в чате, но без подписки) - только недавно созданные
+    if (user.in_chat && (!user.subscription_active && user.subscription_days_left === 0) && user.created_at) {
       const createdDate = new Date(user.created_at);
       const daysSinceCreated = Math.floor((now.getTime() - createdDate.getTime()) / (24 * 60 * 60 * 1000));
       if (daysSinceCreated <= 7) { // Новые за последнюю неделю
@@ -333,14 +408,6 @@ export async function dailyCron(): Promise<Response> {
           reason: `Новый пользователь в чате без активной подписки (${daysSinceCreated} дн.)`
         });
       }
-    }
-    
-    // Пользователи в чате без активной подписки (is_active = true, но expires_at <= now() и subscription_days_left = 0)
-    if (user.is_active && user.expires_at && new Date(user.expires_at) <= now && user.subscription_days_left === 0) {
-      stats.dangerousCases.push({
-        username,
-        reason: "Активен в системе, но подписка истекла"
-      });
     }
   }
 
@@ -409,7 +476,7 @@ export async function publicDeadlineReminder(): Promise<Response> {
   console.log(`📊 Получаем данные пользователей из БД...`);
   const usersRes = await supabase
     .from("users")
-    .select("username, mode, pace, in_chat, is_active, pause_until, public_remind, post_today");
+    .select("username, mode, pace, in_chat, pause_until, public_remind, post_today");
     
   if (usersRes.error) {
     console.error("❌ КРИТИЧЕСКАЯ ОШИБКА: Не удалось получить пользователей:", usersRes.error);
@@ -420,7 +487,7 @@ export async function publicDeadlineReminder(): Promise<Response> {
   console.log(`✅ Загружено ${users.length} записей пользователей`);
   
   // Диагностика пользователей
-  const activeDailyUsers = users.filter(u => u.in_chat && u.is_active && u.pace === "daily");
+  const activeDailyUsers = users.filter(u => u.in_chat && u.pace === "daily");
   console.log(`🔍 Активных пользователей с pace="daily": ${activeDailyUsers.length}`);
   if (activeDailyUsers.length > 0) {
     console.log(`   📋 Список: ${activeDailyUsers.map(u => `${u.username}(${u.pace})`).join(', ')}`);
@@ -440,7 +507,6 @@ export async function publicDeadlineReminder(): Promise<Response> {
   // Фильтруем пользователей по условиям для напоминания
   const textUsers = users.filter(u => 
     u.in_chat && 
-    u.is_active && 
     u.pace === "daily" &&                                 // ТОЛЬКО ежедневный ритм!
     (!u.pause_until || new Date(u.pause_until) <= now) &&
     u.public_remind && 
@@ -451,7 +517,6 @@ export async function publicDeadlineReminder(): Promise<Response> {
   
   const imageUsers = users.filter(u => 
     u.in_chat && 
-    u.is_active && 
     u.pace === "daily" &&                                 // ТОЛЬКО ежедневный ритм!
     (!u.pause_until || new Date(u.pause_until) <= now) &&
     u.public_remind && 
@@ -625,7 +690,7 @@ export async function allInfo(): Promise<Response> {
     const username = user.username || String(user.telegram_id);
     
     // Активные пользователи
-    if (user.in_chat && user.is_active) {
+    if (user.in_chat) {
       stats.totalActive++;
       
       if (user.post_today) {
@@ -636,7 +701,7 @@ export async function allInfo(): Promise<Response> {
     }
     
     // Пользователи с риском
-    if (user.strikes_count === 3 && user.is_active) {
+    if (user.strikes_count === 3 && user.in_chat) {
       stats.riskyUsers.push({username, strikes: user.strikes_count});
     }
     
@@ -655,7 +720,7 @@ export async function allInfo(): Promise<Response> {
     }
     
     // Опасные случаи
-    if (user.strikes_count === 3 && user.is_active) {
+    if (user.strikes_count === 3 && user.in_chat) {
       stats.dangerousCases.push({
         username,
         reason: "3 страйка - на грани исключения"
@@ -669,7 +734,7 @@ export async function allInfo(): Promise<Response> {
       });
     }
     
-    if (user.in_chat && !user.is_active && user.created_at) {
+    if (user.in_chat && (!user.subscription_active && user.subscription_days_left === 0) && user.created_at) {
       const createdDate = new Date(user.created_at);
       const daysSinceCreated = Math.floor((now.getTime() - createdDate.getTime()) / (24 * 60 * 60 * 1000));
       if (daysSinceCreated <= 7) {
@@ -680,10 +745,10 @@ export async function allInfo(): Promise<Response> {
       }
     }
     
-    if (user.is_active && user.expires_at && new Date(user.expires_at) <= now && user.subscription_days_left === 0) {
+    if (user.in_chat && user.subscription_active === false && user.subscription_days_left === 0) {
       stats.dangerousCases.push({
         username,
-        reason: "Активен в системе, но подписка истекла"
+        reason: "В чате без активной подписки и без сохраненных дней"
       });
     }
   }
