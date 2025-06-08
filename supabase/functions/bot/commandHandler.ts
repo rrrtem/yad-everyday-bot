@@ -6,6 +6,8 @@ import { handleStartCommand } from "./startCommand/index.ts";
 import { handlePromoCode } from "./startCommand/states/index.ts";
 import { syncSubscriptionsCommand } from "./tributeApiHandler.ts";
 import { handleChangeModeCommand as handleChangeModeCommandInternal, handleChangeModeCallback } from "./changeModeHandler.ts";
+import { handleChangePaceCommand as handleChangePaceCommandInternal, handleChangePaceCallback } from "./changePaceHandler.ts";
+import { handlePauseCommand, handleUnpauseCommand, handlePauseDaysInput } from "./pauseHandler.ts";
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
@@ -61,8 +63,12 @@ export async function handleTextMessage(message: any): Promise<void> {
     await handlePromoCode(telegramId, text);
     // Состояние очищается внутри handlePromoCode
     console.log(`handleTextMessage: промокод обработан`);
+  } else if (state === "waiting_pause_days") {
+    console.log(`handleTextMessage: обрабатываем количество дней паузы "${text}"`);
+    await handlePauseDaysInput(message);
+    console.log(`handleTextMessage: дни паузы обработаны`);
   } else {
-    console.log(`handleTextMessage: состояние не "waiting_promo", игнорируем сообщение`);
+    console.log(`handleTextMessage: состояние не требует обработки, игнорируем сообщение`);
   }
 }
 
@@ -698,4 +704,11 @@ async function handleCloseSlotsCommand(telegramId: number): Promise<void> {
  */
 export async function handleChangeModeCommand(message: any): Promise<void> {
   await handleChangeModeCommandInternal(message);
+}
+
+/**
+ * Экспорт функции для обработки команды /change_pace
+ */
+export async function handleChangePaceCommand(message: any): Promise<void> {
+  await handleChangePaceCommandInternal(message);
 }

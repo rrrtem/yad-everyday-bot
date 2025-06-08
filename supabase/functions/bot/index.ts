@@ -6,7 +6,9 @@
 import { updateUserFromChatMember } from "./userHandler.ts";
 import { handleDailyPost } from "./dailyPostHandler.ts";
 import { handleStartCommandWrapper, handleGetCommand, handleComebackCommand, handleResetCommand, handleStatusCommand, handleOwnerCommands, handleTextMessage, handleChangeModeCommand } from "./commandHandler.ts";
+import { handlePauseCommand, handleUnpauseCommand } from "./pauseHandler.ts";
 import { handleChangeModeCallback } from "./changeModeHandler.ts";
+import { handleChangePaceCommand, handleChangePaceCallback } from "./changePaceHandler.ts";
 import { handleStartCallbackQuery } from "./startCommand/index.ts";
 import { dailyCron, publicDeadlineReminder } from "./cronHandler/index.ts";
 import { handleNewChatMember } from "./newChatMemberHandler.ts";
@@ -232,6 +234,12 @@ Deno.serve(async (req) => {
         await handleStatusCommand(message);
       } else if (text === "/change_mode") {
         await handleChangeModeCommand(message);
+      } else if (text === "/change_pace") {
+        await handleChangePaceCommand(message);
+      } else if (text === "/pause") {
+        await handlePauseCommand(message);
+      } else if (text === "/unpause") {
+        await handleUnpauseCommand(message);
       } else if (/\B#daily\b/i.test(text)) {
         await handleDailyPost(message);
       } else if (chatType === "private" && message.from.id === OWNER_TELEGRAM_ID && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions", "/slots", "/test_slots", "/close_slots"].includes(text) || text.startsWith("/test_webhook ") || text.startsWith("/open"))) {
@@ -245,9 +253,11 @@ Deno.serve(async (req) => {
     else if (update.callback_query) {
       console.log("Processing callback_query:", update.callback_query.data);
       
-      // Проверяем, является ли это callback для смены режима
+      // Проверяем, является ли это callback для смены режима или ритма
       if (update.callback_query.data && update.callback_query.data.startsWith("change_mode:")) {
         await handleChangeModeCallback(update.callback_query);
+      } else if (update.callback_query.data && update.callback_query.data.startsWith("change_pace:")) {
+        await handleChangePaceCallback(update.callback_query);
       } else {
         // Обрабатываем остальные callback query через стандартный обработчик
         await handleStartCallbackQuery(update.callback_query);
