@@ -6,7 +6,11 @@ import {
   MSG_LINK_CLUB,
   MSG_LINK_STANDARD,
   SPECIAL_PAYMENT_URL,
-  DEFAULT_PAYMENT_URL
+  DEFAULT_PAYMENT_URL,
+  CHALLENGE_JOIN_LINK,
+  CALLBACK_PAYMENT_CLUB,
+  CALLBACK_PAYMENT_STANDARD,
+  CALLBACK_JOIN_CHAT
 } from "../../../constants.ts";
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
@@ -27,7 +31,7 @@ export class PaymentHandler {
       // Проверяем сохраненные дни подписки
       if (await this.hasUnusedSubscriptionDays(user)) {
         const daysLeft = user.subscription_days_left || 0;
-        await sendDirectMessage(telegramId, MSG_DIRECT_CHAT_LINK(daysLeft));
+        await this.sendDirectChatLinkWithButton(telegramId, daysLeft);
         // Очищаем состояние, так как процесс завершен
         await this.clearUserState(telegramId);
         return;
@@ -36,8 +40,7 @@ export class PaymentHandler {
       // Затем проверяем статус клуба
       if (user.club === true) {
         // Пользователь в клубе - отправляем специальную ссылку
-        await sendDirectMessage(telegramId, MSG_LINK_CLUB(SPECIAL_PAYMENT_URL));
-        await this.recordPaymentLinkSent(telegramId);
+        await this.sendClubPaymentLink(telegramId);
       } else {
         // Обычный пользователь - спрашиваем про промокод
         await SetupProcess.sendPromoSelection(telegramId);
@@ -50,12 +53,40 @@ export class PaymentHandler {
   }
   
   /**
-   * Отправляет стандартную ссылку на оплату с кнопкой "У меня есть промокод"
+   * Отправляет сообщение о прямом входе в чат с кнопкой
+   */
+  static async sendDirectChatLinkWithButton(telegramId: number, daysLeft: number): Promise<void> {
+    try {
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🚀 Войти в чат участников", url: CHALLENGE_JOIN_LINK }]
+        ]
+      };
+      
+      await fetch(`${TELEGRAM_API}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: telegramId,
+          text: MSG_DIRECT_CHAT_LINK(daysLeft),
+          parse_mode: "HTML",
+          reply_markup: keyboard
+        })
+      });
+    } catch (error) {
+      console.error("Ошибка в PaymentHandler.sendDirectChatLinkWithButton:", error);
+      await sendDirectMessage(telegramId, MSG_DIRECT_CHAT_LINK(daysLeft));
+    }
+  }
+  
+  /**
+   * Отправляет стандартную ссылку на оплату с кнопками
    */
   static async sendStandardPaymentLink(telegramId: number): Promise<void> {
     try {
       const keyboard = {
         inline_keyboard: [
+          [{ text: "💳 Перейти к оплате", url: DEFAULT_PAYMENT_URL }],
           [{ text: "🎫 У меня есть промокод", callback_data: "have_promo" }]
         ]
       };
@@ -79,15 +110,31 @@ export class PaymentHandler {
   }
   
   /**
-   * Отправляет клубную ссылку на оплату
+   * Отправляет клубную ссылку на оплату с кнопкой
    */
   static async sendClubPaymentLink(telegramId: number): Promise<void> {
     try {
-      await sendDirectMessage(telegramId, MSG_LINK_CLUB(SPECIAL_PAYMENT_URL));
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "💳 Перейти к оплате (спец. цена)", url: SPECIAL_PAYMENT_URL }]
+        ]
+      };
+      
+      await fetch(`${TELEGRAM_API}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: telegramId,
+          text: MSG_LINK_CLUB(SPECIAL_PAYMENT_URL),
+          parse_mode: "HTML",
+          reply_markup: keyboard
+        })
+      });
+      
       await this.recordPaymentLinkSent(telegramId);
     } catch (error) {
       console.error("Ошибка в PaymentHandler.sendClubPaymentLink:", error);
-      await sendDirectMessage(telegramId, "Произошла ошибка. Попробуй еще раз.");
+      await sendDirectMessage(telegramId, MSG_LINK_CLUB(SPECIAL_PAYMENT_URL));
     }
   }
   

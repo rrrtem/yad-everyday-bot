@@ -38,6 +38,48 @@ export async function sendDirectMessage(telegramId: number, text: string): Promi
 }
 
 /**
+ * Отправляет сообщение статуса с кнопками для Tribute и поддержки
+ */
+export async function sendStatusMessageWithButtons(telegramId: number, statusMessage: string): Promise<void> {
+  try {
+    const { TRIBUTE_BOT_LINK, ADMIN_CONTACT } = await import("../constants.ts");
+    
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "💳 Подписка и платежи", url: TRIBUTE_BOT_LINK },
+          { text: "🆘 Поддержка", url: `https://t.me/${ADMIN_CONTACT.replace('@', '')}` }
+        ]
+      ]
+    };
+    
+    const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: telegramId,
+        text: statusMessage,
+        parse_mode: "HTML",
+        reply_markup: keyboard
+      })
+    });
+
+    const respJson = await response.json();
+    if (!respJson.ok) {
+      console.error(`Error sending status message with buttons to ${telegramId}: ${respJson.description}`);
+      // Fallback: отправляем без кнопок
+      await sendDirectMessage(telegramId, statusMessage);
+    } else {
+      console.log(`Status message with buttons sent to ${telegramId}`);
+    }
+  } catch (error) {
+    console.error(`Failed to send status message with buttons to ${telegramId}:`, error);
+    // Fallback: отправляем без кнопок
+    await sendDirectMessage(telegramId, statusMessage);
+  }
+}
+
+/**
  * Находит пользователя по telegram_id.
  */
 export async function findUserByTelegramId(telegramId: number) {

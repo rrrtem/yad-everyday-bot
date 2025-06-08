@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendDirectMessage, findUserByTelegramId, registerUser } from "./userHandler.ts";
+import { sendDirectMessage, findUserByTelegramId, registerUser, sendStatusMessageWithButtons } from "./userHandler.ts";
 import { MSG_START, MSG_GET_CHAT_ID, MSG_WELCOME_RETURNING, MSG_RESET_SUCCESS, OWNER_TELEGRAM_ID, MSG_CHAT_MEMBER_STATUS } from "../constants.ts";
 import { dailyCron, publicDeadlineReminder, allInfo } from "./cronHandler.ts";
 import { handleStartCommand } from "./startCommand/index.ts";
@@ -213,9 +213,9 @@ export async function handleStatusCommand(message: any): Promise<void> {
     
     console.log(`handleStatusCommand: пользователь найден, формирую статус`);
     
-    // Формируем и отправляем сообщение со статусом
+    // Формируем и отправляем сообщение со статусом с кнопками
     const statusMessage = MSG_CHAT_MEMBER_STATUS(user);
-    await sendDirectMessage(telegramId, statusMessage);
+    await sendStatusMessageWithButtons(telegramId, statusMessage);
     
     console.log(`handleStatusCommand: статус отправлен пользователю ${telegramId}`);
     

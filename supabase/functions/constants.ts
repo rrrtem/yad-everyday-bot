@@ -63,7 +63,16 @@ export const MODE_PACE_CONFIG = {
 };
 
 // Валидные промокоды (позже можно вынести в БД)
-export const VALID_PROMO_CODES = ["CLUB2024", "RETURN"];
+export const VALID_PROMO_CODES = ["YASSS", "FREE10"];
+
+// Типы промокодов
+export const PROMO_TYPES = {
+  CLUB_DISCOUNT: "YASSS",    // Дает скидку для участников клуба
+  FREE_DAYS: "FREE10"        // Дает бесплатные дни
+};
+
+// Количество бесплатных дней для промокода FREE10
+export const FREE_PROMO_DAYS = 10;
 
 // =====================================================
 // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
@@ -420,6 +429,14 @@ export const MSG_DIRECT_CHAT_LINK = (daysLeft: number) => `🎉 Отлично! 
 ${CHALLENGE_JOIN_LINK}
 `;
 
+export const MSG_FREE_PROMO_SUCCESS = (daysLeft: number) => `🎉 Промокод успешно активирован!
+
+Тебе начислено ${daysLeft} ${pluralizeDays(daysLeft)} бесплатного участия в практике!
+
+Переходи сразу в чат участников:
+${CHALLENGE_JOIN_LINK}
+`;
+
 
 
 // =====================================================
@@ -613,10 +630,25 @@ export const MSG_CHAT_MEMBER_STATUS = (user: any) => {
     statusMessage += `\n`;
   }
   
-  // Ссылки для управления
-  statusMessage += `Подписка и платежи: ${TRIBUTE_BOT_LINK}\n`;
-  statusMessage += `Поддержка и вопросы: ${ADMIN_CONTACT}\n\n`;
-    
   return statusMessage;
 };
+
+// =====================================================
+// CALLBACK DATA ДЛЯ КНОПОК
+// =====================================================
+
+// Callback data для кнопок оплаты
+export const CALLBACK_PAYMENT_CLUB = "payment_club";
+export const CALLBACK_PAYMENT_STANDARD = "payment_standard";
+
+// Callback data для кнопок входа в чат
+export const CALLBACK_JOIN_CHAT = "join_chat";
+
+// Callback data для промокодов (уже есть в коде)
+export const CALLBACK_NO_PROMO = "no_promo";
+export const CALLBACK_HAVE_PROMO = "have_promo";
+
+// Callback data для кнопок статуса
+export const CALLBACK_TRIBUTE_BOT = "tribute_bot";
+export const CALLBACK_ADMIN_CONTACT = "admin_contact";
 

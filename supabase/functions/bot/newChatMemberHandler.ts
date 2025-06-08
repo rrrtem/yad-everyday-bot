@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { findUserByTelegramId, registerUser, sendDirectMessage } from "./userHandler.ts";
+import { findUserByTelegramId, registerUser, sendDirectMessage, sendStatusMessageWithButtons } from "./userHandler.ts";
 import { MSG_CHAT_MEMBER_STATUS } from "../constants.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -115,8 +115,8 @@ export async function handleNewChatMember(chatMemberUpdate: any): Promise<void> 
     const updatedUser = await findUserByTelegramId(telegramId);
     if (updatedUser) {
       const statusMessage = MSG_CHAT_MEMBER_STATUS(updatedUser);
-      await sendDirectMessage(telegramId, statusMessage);
-      console.log(`handleNewChatMember: отправлено сообщение о статусе пользователю ${telegramId}`);
+      await sendStatusMessageWithButtons(telegramId, statusMessage);
+      console.log(`handleNewChatMember: отправлено сообщение о статусе с кнопками пользователю ${telegramId}`);
     }
   } catch (statusError) {
     console.error(`handleNewChatMember: ошибка отправки сообщения о статусе пользователю ${telegramId}:`, statusError);

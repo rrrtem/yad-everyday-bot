@@ -10,6 +10,7 @@ import {
   MSG_SYNC_COMPLETE,
   MSG_SUBSCRIPTION_EXPIRED_NOTIFICATION,
   OWNER_TELEGRAM_ID,
+  CHALLENGE_JOIN_LINK,
   pluralizeDays
 } from "../constants.ts";
 
@@ -103,6 +104,41 @@ async function sendTelegramMessage(telegramId: number, text: string): Promise<vo
     }
   } catch (error) {
     console.error("Error sending Telegram message:", error);
+  }
+}
+
+/**
+ * Отправка сообщения в Telegram с кнопкой входа в чат
+ */
+async function sendTelegramMessageWithChatButton(telegramId: number, text: string): Promise<void> {
+  try {
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🚀 Войти в чат участников", url: CHALLENGE_JOIN_LINK }]
+      ]
+    };
+    
+    const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: telegramId,
+        text: text,
+        parse_mode: "HTML",
+        reply_markup: keyboard
+      })
+    });
+
+    const result = await response.json();
+    if (!result.ok) {
+      console.error("Failed to send Telegram message with button:", result);
+      // Fallback: отправляем без кнопки
+      await sendTelegramMessage(telegramId, text);
+    }
+  } catch (error) {
+    console.error("Error sending Telegram message with button:", error);
+    // Fallback: отправляем без кнопки
+    await sendTelegramMessage(telegramId, text);
   }
 }
 
@@ -305,11 +341,11 @@ export async function handleNewSubscription(payload: TributeNewSubscriptionPaylo
       });
     }
 
-    // Отправляем уведомление пользователю
+    // Отправляем уведомление пользователю с кнопкой входа в чат
     if (bonusDays > 0) {
-      await sendTelegramMessage(telegram_user_id, MSG_SUBSCRIPTION_RENEWED_WITH_BONUS(bonusDays));
+      await sendTelegramMessageWithChatButton(telegram_user_id, MSG_SUBSCRIPTION_RENEWED_WITH_BONUS(bonusDays));
     } else {
-      await sendTelegramMessage(telegram_user_id, MSG_SUBSCRIPTION_RENEWED);
+      await sendTelegramMessageWithChatButton(telegram_user_id, MSG_SUBSCRIPTION_RENEWED);
     }
 
     console.log(`Successfully processed new subscription for user ${telegram_user_id}`);

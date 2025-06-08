@@ -1,4 +1,5 @@
 import { findUserByTelegramId, registerUser, updateExistingUser } from "../userHandler.ts";
+import clubData from "./club.json" assert { type: "json" };
 
 export type FlowType = 'new_user' | 'active_user' | 'continue_setup' | 'returning_user' | 'in_waitlist';
 
@@ -38,6 +39,11 @@ export class UserAnalyzer {
       isReturningUser = user.joined_at !== null;
     }
     
+    // Шаг 1.5: Проверяем участие в клубе по username
+    await this.checkAndSetClubMembership(telegramId, telegramUserData);
+    // Обновляем данные пользователя после возможного изменения статуса клуба
+    user = await findUserByTelegramId(telegramId);
+    
     // Шаг 2: Определяем тип Flow
     const flowType = this.determineFlowType(user, isNewUser, isReturningUser);
     
@@ -55,6 +61,61 @@ export class UserAnalyzer {
       hasSavedDays,
       daysLeft
     };
+  }
+  
+  /**
+   * Проверяет, является ли пользователь участником клуба по username и обновляет статус в БД
+   */
+  private async checkAndSetClubMembership(telegramId: number, telegramUserData: any): Promise<void> {
+    try {
+      const username = telegramUserData.username;
+      
+      if (!username) {
+        console.log(`UserAnalyzer: у пользователя ${telegramId} нет username, пропускаем проверку клуба`);
+        return;
+      }
+      
+      const isClubMember = this.isUserInClub(username);
+      console.log(`UserAnalyzer: проверка клуба для @${username}: ${isClubMember ? 'найден' : 'не найден'}`);
+      
+      if (isClubMember) {
+        await this.setClubMembership(telegramId, true);
+        console.log(`UserAnalyzer: автоматически проставлен club=true для пользователя ${telegramId} (@${username})`);
+      }
+      
+    } catch (error) {
+      console.error("UserAnalyzer: ошибка при проверке участия в клубе:", error);
+    }
+  }
+  
+  /**
+   * Проверяет, есть ли username в списке участников клуба
+   */
+  private isUserInClub(username: string): boolean {
+    return clubData.club_members.includes(username.toLowerCase());
+  }
+  
+  /**
+   * Устанавливает статус участия в клубе в БД
+   */
+  private async setClubMembership(telegramId: number, clubStatus: boolean): Promise<void> {
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
+    
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("users")
+      .update({
+        club: clubStatus,
+        updated_at: now
+      })
+      .eq("telegram_id", telegramId);
+      
+    if (error) {
+      console.error("UserAnalyzer: ошибка при обновлении статуса клуба:", error);
+    }
   }
   
   private determineFlowType(user: any, isNewUser: boolean, isReturningUser: boolean): FlowType {
