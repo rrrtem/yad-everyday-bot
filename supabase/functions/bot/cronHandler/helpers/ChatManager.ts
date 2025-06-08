@@ -1,4 +1,4 @@
-import { removeUserFromChatWithoutBan } from "../../constants.ts";
+import { removeUserFromChatWithoutBan } from "../../utils/telegramUtils.ts";
 import { sendDirectMessage } from "../../userHandler.ts";
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");

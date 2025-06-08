@@ -42,7 +42,7 @@ export async function sendDirectMessage(telegramId: number, text: string): Promi
  */
 export async function sendStatusMessageWithButtons(telegramId: number, statusMessage: string): Promise<void> {
   try {
-    const { TRIBUTE_BOT_LINK, ADMIN_CONTACT } = await import("../constants.ts");
+    const { TRIBUTE_BOT_LINK, ADMIN_CONTACT } = await import("./constants.ts");
     
     const keyboard = {
       inline_keyboard: [

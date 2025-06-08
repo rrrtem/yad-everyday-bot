@@ -5,7 +5,8 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import { updateUserFromChatMember } from "./userHandler.ts";
 import { handleDailyPost } from "./dailyPostHandler.ts";
-import { handleStartCommandWrapper, handleGetCommand, handleComebackCommand, handleResetCommand, handleStatusCommand, handleOwnerCommands, handleTextMessage } from "./commandHandler.ts";
+import { handleStartCommandWrapper, handleGetCommand, handleComebackCommand, handleResetCommand, handleStatusCommand, handleOwnerCommands, handleTextMessage, handleChangeModeCommand } from "./commandHandler.ts";
+import { handleChangeModeCallback } from "./changeModeHandler.ts";
 import { handleStartCallbackQuery } from "./startCommand/index.ts";
 import { dailyCron, publicDeadlineReminder } from "./cronHandler/index.ts";
 import { handleNewChatMember } from "./newChatMemberHandler.ts";
@@ -229,6 +230,8 @@ Deno.serve(async (req) => {
         await handleResetCommand(message);
       } else if (text === "/status") {
         await handleStatusCommand(message);
+      } else if (text === "/change_mode") {
+        await handleChangeModeCommand(message);
       } else if (/\B#daily\b/i.test(text)) {
         await handleDailyPost(message);
       } else if (chatType === "private" && message.from.id === OWNER_TELEGRAM_ID && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions", "/slots", "/test_slots", "/close_slots"].includes(text) || text.startsWith("/test_webhook ") || text.startsWith("/open"))) {
@@ -241,7 +244,14 @@ Deno.serve(async (req) => {
     // Обработка callback_query (нажатия на inline кнопки)
     else if (update.callback_query) {
       console.log("Processing callback_query:", update.callback_query.data);
-      await handleStartCallbackQuery(update.callback_query);
+      
+      // Проверяем, является ли это callback для смены режима
+      if (update.callback_query.data && update.callback_query.data.startsWith("change_mode:")) {
+        await handleChangeModeCallback(update.callback_query);
+      } else {
+        // Обрабатываем остальные callback query через стандартный обработчик
+        await handleStartCallbackQuery(update.callback_query);
+      }
     }
     // Обработка chat_member (добавление/удаление участников)
     else if (update.chat_member) {

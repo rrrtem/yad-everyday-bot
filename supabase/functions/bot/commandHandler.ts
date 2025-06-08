@@ -5,6 +5,7 @@ import { dailyCron, publicDeadlineReminder, allInfo } from "./cronHandler/index.
 import { handleStartCommand } from "./startCommand/index.ts";
 import { handlePromoCode } from "./startCommand/states/index.ts";
 import { syncSubscriptionsCommand } from "./tributeApiHandler.ts";
+import { handleChangeModeCommand as handleChangeModeCommandInternal, handleChangeModeCallback } from "./changeModeHandler.ts";
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
@@ -480,7 +481,7 @@ async function handleOpenSlotsCommand(telegramId: number, text: string): Promise
   try {
     // Импортируем SlotManager
     const { SlotManager } = await import("./startCommand/flows/SlotManager.ts");
-    const { MSG_SLOTS_OPENED, MSG_SLOTS_STATUS } = await import("../constants.ts");
+    const { MSG_SLOTS_OPENED, MSG_SLOTS_STATUS } = await import("./constants.ts");
     
     await sendDirectMessage(telegramId, `🔄 Устанавливаю ${slotsToSet} доступных мест...`);
     
@@ -554,7 +555,7 @@ async function processWaitlistUsers(maxUsers: number): Promise<number> {
         }
         
         // Отправляем уведомление
-        const { MSG_WAITLIST_OPENED } = await import("../constants.ts");
+        const { MSG_WAITLIST_OPENED } = await import("./constants.ts");
         await sendDirectMessage(user.telegram_id, MSG_WAITLIST_OPENED);
         
         // Запускаем процесс настройки
@@ -582,7 +583,7 @@ async function processWaitlistUsers(maxUsers: number): Promise<number> {
 async function handleSlotsStatusCommand(telegramId: number): Promise<void> {
   try {
     const { SlotManager } = await import("./startCommand/flows/SlotManager.ts");
-    const { MSG_SLOTS_STATUS } = await import("../constants.ts");
+    const { MSG_SLOTS_STATUS } = await import("./constants.ts");
     
     const stats = await SlotManager.getSlotStats();
     const statusMessage = MSG_SLOTS_STATUS(stats.available, stats.total);
@@ -670,7 +671,7 @@ async function handleTestSlotsCommand(telegramId: number): Promise<void> {
 async function handleCloseSlotsCommand(telegramId: number): Promise<void> {
   try {
     const { SlotManager } = await import("./startCommand/flows/SlotManager.ts");
-    const { MSG_SLOTS_CLOSED, MSG_SLOTS_STATUS } = await import("../constants.ts");
+    const { MSG_SLOTS_CLOSED, MSG_SLOTS_STATUS } = await import("./constants.ts");
     
     await sendDirectMessage(telegramId, "🔄 Закрываю все доступные места...");
     
@@ -690,4 +691,11 @@ async function handleCloseSlotsCommand(telegramId: number): Promise<void> {
     console.error("Ошибка в handleCloseSlotsCommand:", error);
     await sendDirectMessage(telegramId, `❌ Ошибка закрытия мест: ${error.message}`);
   }
+}
+
+/**
+ * Экспорт функции для обработки команды /change_mode
+ */
+export async function handleChangeModeCommand(message: any): Promise<void> {
+  await handleChangeModeCommandInternal(message);
 }
