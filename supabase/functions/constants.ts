@@ -506,23 +506,61 @@ export const MSG_CHAT_MEMBER_STATUS = (user: any) => {
   const now = new Date();
   let statusMessage = `Все важное про участие в практике\n\n`;
 
-  // Информация о подписке
+  // Информация о подписке - проверяем разные состояния
 
-
-  if (user.subscription_active) {
-    statusMessage += `✅ Подписка активна\n \n`;
+  // Состояние 4: Пользователь не в чате
+  if (user.is_in_chat === false || user.in_chat === false) {
+    statusMessage += `❌ Ты не находишься в чате участников\n`;
+    if (user.subscription_days_left > 0) {
+      // Вычисляем до какой даты действуют сохранённые дни
+      const savedDaysEndDate = new Date(now);
+      savedDaysEndDate.setDate(savedDaysEndDate.getDate() + user.subscription_days_left);
+      statusMessage += `• У тебя есть ${user.subscription_days_left} ${pluralizeDays(user.subscription_days_left)} с прошлой подписки\n`;
+      statusMessage += `• Действуют до: ${savedDaysEndDate.toLocaleDateString('ru-RU')}\n`;
+    } else {
+      statusMessage += `• Сохранённых дней нет\n`;
+    }
+    statusMessage += `\n`;
+  }
+  // Состояние 1: Есть сохранённые дни, активной подписки нет
+  else if (user.subscription_days_left > 0 && !user.subscription_active) {
+    // Вычисляем до какой даты действуют сохранённые дни
+    const savedDaysEndDate = new Date(now);
+    savedDaysEndDate.setDate(savedDaysEndDate.getDate() + user.subscription_days_left);
+    
+    statusMessage += `💰 Используются сохранённые дни с прошлой подписки\n`;
+    statusMessage += `• Осталось дней: ${user.subscription_days_left}\n`;
+    statusMessage += `• Действуют до: ${savedDaysEndDate.toLocaleDateString('ru-RU')}\n`;
+    statusMessage += `• Новая подписка в Tribute пока не нужна\n\n`;
+  }
+  // Состояние 2: Есть активная подписка, сохранённых дней нет
+  else if (user.subscription_active && user.subscription_days_left === 0) {
+    statusMessage += `✅ Подписка активна\n`;
     if (user.expires_at) {
       const expiresDate = new Date(user.expires_at);
       const daysLeft = Math.ceil((expiresDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       statusMessage += `• Действует до: ${expiresDate.toLocaleDateString('ru-RU')}\n`;
       statusMessage += `• Осталось дней: ${daysLeft > 0 ? daysLeft : 0}\n`;
     }
-  } else {
-    statusMessage += `❓ Подписка не активна или еще не обновились данные\n \n`;
-    
+    statusMessage += `\n`;
   }
-  if (user.subscription_days_left > 0) {
-    statusMessage += `• Сохранённые дни с прошлой подписки: ${user.subscription_days_left} ${pluralizeDays(user.subscription_days_left)}\n`;
+  // Смешанное состояние: и подписка активна, и есть сохранённые дни
+  else if (user.subscription_active && user.subscription_days_left > 0) {
+    statusMessage += `✅ Подписка активна + есть сохранённые дни\n`;
+    if (user.expires_at) {
+      const expiresDate = new Date(user.expires_at);
+      const daysLeft = Math.ceil((expiresDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      statusMessage += `• Активная подписка до: ${expiresDate.toLocaleDateString('ru-RU')} (${daysLeft > 0 ? daysLeft : 0} дней)\n`;
+    }
+    statusMessage += `• Плюс сохранённые дни: ${user.subscription_days_left} ${pluralizeDays(user.subscription_days_left)}\n`;
+    statusMessage += `\n`;
+  }
+  // Состояние 3: Непонятное состояние - нет ни подписки, ни сохранённых дней
+  else {
+    statusMessage += `❓ Статус подписки неопределён\n`;
+    statusMessage += `• Активной подписки: ${user.subscription_active ? 'да' : 'нет'}\n`;
+    statusMessage += `• Сохранённых дней: ${user.subscription_days_left || 0}\n`;
+    statusMessage += `• Возможно, данные ещё не обновились\n\n`;
   }
   statusMessage += `\n`;
 

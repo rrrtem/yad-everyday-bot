@@ -60,6 +60,7 @@ supabase/
    ```
 4. Настройте webhook в Tribute Dashboard
 
+5. git add . && git commit -m "update" && git push origin main
 ## Переменные окружения
 
 ### Основные
