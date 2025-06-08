@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findUserByTelegramId, registerUser, sendDirectMessage } from "./userHandler.ts";
-import { MSG_DAILY_ACCEPTED, MSG_PAUSE_REMOVED_BY_POST, MSG_DAILY_TO_GROUPCHAT } from "./constants.ts";
+import { MSG_DAILY_ACCEPTED, MSG_DAILY_MILESTONE, MSG_PAUSE_REMOVED_BY_POST, MSG_DAILY_TO_GROUPCHAT } from "./constants.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -60,6 +60,7 @@ export async function handleDailyPost(message: any): Promise<void> {
         post_today: true,
         last_post_date: todayDate,
         units_count: 1,
+        consecutive_posts_count: 1,
         updated_at: now,
         last_activity_at: now
       })
@@ -69,7 +70,13 @@ export async function handleDailyPost(message: any): Promise<void> {
       console.error("handleDailyPost: ошибка при обновлении нового пользователя:", error.message);
     } else {
       console.log("handleDailyPost: новый пользователь обновлен успешно");
-      await sendDirectMessage(telegramId, MSG_DAILY_ACCEPTED);
+      const dailyMessage = MSG_DAILY_ACCEPTED(1, 1);
+      await sendDirectMessage(telegramId, dailyMessage);
+      
+      // Проверяем на круглое число (для первого поста это 10, 20, 30...)
+      if (1 % 10 === 0) {
+        await sendDirectMessage(telegramId, MSG_DAILY_MILESTONE(1));
+      }
     }
     return;
   }
@@ -77,9 +84,12 @@ export async function handleDailyPost(message: any): Promise<void> {
   // Пользователь найден - обрабатываем пост
   console.log(`handleDailyPost: пользователь найден, post_today = ${user.post_today}`);
   
+  // Вычисляем новое количество постов
+  const newUnitsCount = (user.units_count || 0) + 1;
+  
   // Увеличиваем units_count при каждом принятом посте с #daily
   let updateData: any = {
-    units_count: (user.units_count || 0) + 1,
+    units_count: newUnitsCount,
     last_post_date: todayDate,
     updated_at: now,
     last_activity_at: now
@@ -106,6 +116,10 @@ export async function handleDailyPost(message: any): Promise<void> {
     updateData.post_today = true;
     updateData.strikes_count = 0; // Сброс страйков при любом посте
     
+    // Увеличиваем consecutive_posts_count
+    const newConsecutivePosts = (user.consecutive_posts_count || 0) + 1;
+    updateData.consecutive_posts_count = newConsecutivePosts;
+    
     // Проверяем, был ли пользователь на паузе
     if (user.pause_until && new Date(user.pause_until) > new Date()) {
       // Пользователь был на паузе - снимаем с паузы
@@ -124,6 +138,15 @@ export async function handleDailyPost(message: any): Promise<void> {
       } else {
         console.log("handleDailyPost: пользователь снят с паузы успешно");
         await sendDirectMessage(telegramId, MSG_PAUSE_REMOVED_BY_POST);
+        
+        // Отправляем также обычное сообщение о принятии поста
+        const dailyMessage = MSG_DAILY_ACCEPTED(newUnitsCount, newConsecutivePosts);
+        await sendDirectMessage(telegramId, dailyMessage);
+        
+        // Проверяем на круглое число
+        if (newUnitsCount % 10 === 0) {
+          await sendDirectMessage(telegramId, MSG_DAILY_MILESTONE(newUnitsCount));
+        }
       }
     } else {
       // Обычный первый пост за день
@@ -138,7 +161,13 @@ export async function handleDailyPost(message: any): Promise<void> {
         console.error("handleDailyPost: ошибка при обновлении первого поста:", error.message);
       } else {
         console.log("handleDailyPost: первый пост учтен успешно");
-        await sendDirectMessage(telegramId, MSG_DAILY_ACCEPTED);
+        const dailyMessage = MSG_DAILY_ACCEPTED(newUnitsCount, newConsecutivePosts);
+        await sendDirectMessage(telegramId, dailyMessage);
+        
+        // Проверяем на круглое число
+        if (newUnitsCount % 10 === 0) {
+          await sendDirectMessage(telegramId, MSG_DAILY_MILESTONE(newUnitsCount));
+        }
       }
     }
   }

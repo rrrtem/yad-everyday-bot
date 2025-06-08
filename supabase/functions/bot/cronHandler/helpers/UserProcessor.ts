@@ -20,6 +20,7 @@ export interface User {
   pace: string;
   post_today: boolean;
   strikes_count: number;
+  consecutive_posts_count?: number; // Количество постов подряд без пропусков
   pause_until?: string;
   pause_started_at?: string;
   pause_days: number;
@@ -105,6 +106,7 @@ export class UserProcessor {
     let messageToSend = "";
     let updateData: any = {
       strikes_count: newStrikes,
+      consecutive_posts_count: 0, // Сброс последовательных постов при страйке
       updated_at: now.toISOString()
     };
     

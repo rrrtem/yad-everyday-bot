@@ -64,6 +64,7 @@ export async function handleNewChatMember(chatMemberUpdate: any): Promise<void> 
     in_chat: true,
     joined_at: now.toISOString(),
     strikes_count: 0, // Сброс страйков при входе в чат
+    consecutive_posts_count: 0, // Сброс последовательных постов при входе в чат
     post_today: false,
     updated_at: now.toISOString()
   };

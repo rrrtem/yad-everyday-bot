@@ -112,6 +112,7 @@ export async function registerUser(telegramUser: any) {
     subscription_active: false,
     club: false,
     strikes_count: DEFAULT_STRIKES_COUNT,
+    consecutive_posts_count: 0,
     post_today: false,
     last_post_date: null,
     units_count: 0,
@@ -203,6 +204,7 @@ export async function updateUserFromChatMember(chatMemberUpdate: any) {
           in_chat: true,
           joined_at: now,
           strikes_count: 0,
+          consecutive_posts_count: 0,
           updated_at: now
         })
         .eq("telegram_id", telegramId);
@@ -224,6 +226,7 @@ export async function updateUserFromChatMember(chatMemberUpdate: any) {
     updateData.joined_at = now;
     updateData.left_at = null;
     updateData.strikes_count = 0;
+    updateData.consecutive_posts_count = 0;
     updateData.post_today = false;
     
     // ❌ УБИРАЕМ ОШИБОЧНОЕ ОБНУЛЕНИЕ subscription_days_left

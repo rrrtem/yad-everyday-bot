@@ -31,6 +31,7 @@
 - post_today (boolean) — Отправил ли пост сегодня (сбрасывается в 04:00 UTC)
 - last_post_date (date) — Дата последнего поста
 - units_count (int) — Общее количество постов пользователя
+- consecutive_posts_count (int) — Количество постов подряд без пропусков (сбрасывается при страйке)
 - pause_started_at, pause_until, pause_days — Информация о паузе
 - mode (enum: "text", "image") — Режим участия
 - pace (enum: "daily", "weekly") — Ритм участия
@@ -207,9 +208,14 @@
 - **Увеличиваем units_count при каждом принятом посте с #daily** (всегда)
 - Если первый пост за день (post_today = false):
   - post_today = true, strikes_count = 0
+  - **Увеличиваем consecutive_posts_count на 1** (количество постов подряд без пропусков)
   - Если был на паузе — снимаем с паузы, отправляем MSG_PAUSE_REMOVED_BY_POST
-  - Иначе отправляем MSG_DAILY_ACCEPTED
+  - Отправляем MSG_DAILY_ACCEPTED(units_count, consecutive_posts_count)
+  - **Если units_count кратно 10 — отправляем MSG_DAILY_MILESTONE(units_count)**
 - Если уже был пост сегодня (post_today = true) — только обновляем units_count и last_post_date без сообщения
+
+**Новые поля БД:**
+- **consecutive_posts_count** — количество постов подряд без пропусков (сбрасывается при страйке или входе в чат)
 
 ### Б2. Ежедневный cron в 04:00 UTC (dailyCron)
 
@@ -221,6 +227,7 @@
 1. **Проверка активных пользователей с ежедневным ритмом (страйки)**
    - Для всех пользователей с in_chat = true и pace = "daily"
    - Если post_today = false (не прислал пост) и НЕ на паузе → увеличиваем strikes_count на 1
+   - **Сбрасываем consecutive_posts_count = 0** (прерывается серия постов)
    - Отправляем сообщения о страйках (MSG_STRIKE_FIRST/SECOND/THIRD/FOURTH)
    - При 4-м страйке → ставим на паузу (pause_until = now + 7 дней)
 
