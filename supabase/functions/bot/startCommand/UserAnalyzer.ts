@@ -12,6 +12,8 @@ export interface UserContext {
   isReturningUser: boolean;
   hasSavedDays: boolean;
   daysLeft: number;
+  autoTriggered?: boolean; // Запущен автоматически от текстового сообщения
+  originalMessage?: string; // Оригинальное сообщение пользователя
 }
 
 /**
@@ -19,7 +21,7 @@ export interface UserContext {
  */
 export class UserAnalyzer {
   
-  async analyze(telegramId: number, telegramUserData: any): Promise<UserContext> {
+  async analyze(telegramId: number, telegramUserData: any, autoTriggered: boolean = false, originalMessage?: string): Promise<UserContext> {
     // Шаг 1: Регистрация/актуализация пользователя
     let user = await findUserByTelegramId(telegramId);
     let isNewUser = false;
@@ -59,7 +61,9 @@ export class UserAnalyzer {
       isNewUser,
       isReturningUser,
       hasSavedDays,
-      daysLeft
+      daysLeft,
+      autoTriggered,
+      originalMessage
     };
   }
   
@@ -67,24 +71,19 @@ export class UserAnalyzer {
    * Проверяет, является ли пользователь участником клуба по username и обновляет статус в БД
    */
   private async checkAndSetClubMembership(telegramId: number, telegramUserData: any): Promise<void> {
-    try {
-      const username = telegramUserData.username;
-      
-      if (!username) {
-        console.log(`UserAnalyzer: у пользователя ${telegramId} нет username, пропускаем проверку клуба`);
-        return;
-      }
-      
-      const isClubMember = this.isUserInClub(username);
-      console.log(`UserAnalyzer: проверка клуба для @${username}: ${isClubMember ? 'найден' : 'не найден'}`);
-      
-      if (isClubMember) {
-        await this.setClubMembership(telegramId, true);
-        console.log(`UserAnalyzer: автоматически проставлен club=true для пользователя ${telegramId} (@${username})`);
-      }
-      
-    } catch (error) {
-      console.error("UserAnalyzer: ошибка при проверке участия в клубе:", error);
+    const username = telegramUserData.username;
+    
+    if (!username) {
+      // console.log(`UserAnalyzer: у пользователя ${telegramId} нет username, пропускаем проверку клуба`);
+      return;
+    }
+
+    const isClubMember = this.isUserInClub(username);
+    // console.log(`UserAnalyzer: проверка клуба для @${username}: ${isClubMember ? 'найден' : 'не найден'}`);
+
+    if (isClubMember) {
+      await this.setClubMembership(telegramId, true);
+      // console.log(`UserAnalyzer: автоматически проставлен club=true для пользователя ${telegramId} (@${username})`);
     }
   }
   

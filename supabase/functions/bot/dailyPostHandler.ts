@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { findUserByTelegramId, registerUser, sendDirectMessage } from "./userHandler.ts";
+import { findUserByTelegramId, registerUser, sendDirectMessage, sendMessageWithAutoDelete } from "./userHandler.ts";
 import { MSG_DAILY_ACCEPTED, MSG_DAILY_MILESTONE, MSG_PAUSE_REMOVED_BY_POST, MSG_DAILY_TO_GROUPCHAT } from "./constants.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -71,11 +71,11 @@ export async function handleDailyPost(message: any): Promise<void> {
     } else {
       console.log("handleDailyPost: новый пользователь обновлен успешно");
       const dailyMessage = MSG_DAILY_ACCEPTED(1, 1);
-      await sendDirectMessage(telegramId, dailyMessage);
+      await sendMessageWithAutoDelete(telegramId, dailyMessage, 'daily');
       
       // Проверяем на круглое число (для первого поста это 10, 20, 30...)
       if (1 % 10 === 0) {
-        await sendDirectMessage(telegramId, MSG_DAILY_MILESTONE(1));
+        await sendMessageWithAutoDelete(telegramId, MSG_DAILY_MILESTONE(1), 'milestone');
       }
     }
     return;
@@ -141,11 +141,11 @@ export async function handleDailyPost(message: any): Promise<void> {
         
         // Отправляем также обычное сообщение о принятии поста
         const dailyMessage = MSG_DAILY_ACCEPTED(newUnitsCount, newConsecutivePosts);
-        await sendDirectMessage(telegramId, dailyMessage);
+        await sendMessageWithAutoDelete(telegramId, dailyMessage, 'daily');
         
         // Проверяем на круглое число
         if (newUnitsCount % 10 === 0) {
-          await sendDirectMessage(telegramId, MSG_DAILY_MILESTONE(newUnitsCount));
+          await sendMessageWithAutoDelete(telegramId, MSG_DAILY_MILESTONE(newUnitsCount), 'milestone');
         }
       }
     } else {
@@ -162,11 +162,11 @@ export async function handleDailyPost(message: any): Promise<void> {
       } else {
         console.log("handleDailyPost: первый пост учтен успешно");
         const dailyMessage = MSG_DAILY_ACCEPTED(newUnitsCount, newConsecutivePosts);
-        await sendDirectMessage(telegramId, dailyMessage);
+        await sendMessageWithAutoDelete(telegramId, dailyMessage, 'daily');
         
         // Проверяем на круглое число
         if (newUnitsCount % 10 === 0) {
-          await sendDirectMessage(telegramId, MSG_DAILY_MILESTONE(newUnitsCount));
+          await sendMessageWithAutoDelete(telegramId, MSG_DAILY_MILESTONE(newUnitsCount), 'milestone');
         }
       }
     }

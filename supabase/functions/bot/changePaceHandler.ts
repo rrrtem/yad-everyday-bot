@@ -33,11 +33,11 @@ async function sendPaceChangeMessage(telegramId: number, currentPace: string): P
 
     if (currentPace === AVAILABLE_PACES.DAILY) {
       message = MSG_CHANGE_PACE_CURRENT_DAILY;
-      buttonText = "Раз в неделю";
+      buttonText = "Перейти на «Раз в неделю»";
       callbackData = CALLBACK_CHANGE_PACE_WEEKLY;
     } else {
       message = MSG_CHANGE_PACE_CURRENT_WEEKLY;
-      buttonText = "Каждый день";
+      buttonText = "Перейти на «Каждый день»";
       callbackData = CALLBACK_CHANGE_PACE_DAILY;
     }
 
@@ -81,11 +81,11 @@ async function sendPaceSuccessMessage(telegramId: number, newPace: string): Prom
 
     if (newPace === AVAILABLE_PACES.WEEKLY) {
       message = MSG_CHANGE_PACE_SUCCESS_TO_WEEKLY;
-      buttonText = "Каждый день";
+      buttonText = "Перейти на «Каждый день";
       callbackData = CALLBACK_CHANGE_PACE_DAILY;
     } else {
       message = MSG_CHANGE_PACE_SUCCESS_TO_DAILY;
-      buttonText = "Раз в неделю";
+      buttonText = "Перейти на «Раз в неделю»";
       callbackData = CALLBACK_CHANGE_PACE_WEEKLY;
     }
 
@@ -123,10 +123,10 @@ async function sendPaceSuccessMessage(telegramId: number, newPace: string): Prom
  * Показывает пользователю возможность изменить ритм участия
  */
 export async function handleChangePaceCommand(message: any): Promise<void> {
-  console.log("handleChangePaceCommand called", JSON.stringify(message));
+  // console.log("handleChangePaceCommand called", JSON.stringify(message));
 
   if (!message || !message.from) {
-    console.log("handleChangePaceCommand: недостаточно данных в сообщении");
+    // console.log("handleChangePaceCommand: недостаточно данных в сообщении");
     return;
   }
 
@@ -137,7 +137,7 @@ export async function handleChangePaceCommand(message: any): Promise<void> {
     const user = await findUserByTelegramId(telegramId);
     
     if (!user) {
-      console.log(`handleChangePaceCommand: пользователь ${telegramId} не найден`);
+      // console.log(`handleChangePaceCommand: пользователь ${telegramId} не найден`);
       await sendDirectMessage(telegramId, MSG_CHANGE_PACE_NOT_ACTIVE);
       return;
     }
@@ -146,7 +146,7 @@ export async function handleChangePaceCommand(message: any): Promise<void> {
     const isActive = user.in_chat || user.subscription_active || user.subscription_days_left > 0;
     
     if (!isActive) {
-      console.log(`handleChangePaceCommand: пользователь ${telegramId} не активен`);
+      // console.log(`handleChangePaceCommand: пользователь ${telegramId} не активен`);
       await sendDirectMessage(telegramId, MSG_CHANGE_PACE_NOT_ACTIVE);
       return;
     }
@@ -155,7 +155,7 @@ export async function handleChangePaceCommand(message: any): Promise<void> {
     const currentPace = user.pace || AVAILABLE_PACES.DAILY;
 
     // Отправляем сообщение с возможностью смены ритма
-    console.log(`handleChangePaceCommand: отправляем предложение смены ритма пользователю ${telegramId}, текущий ритм: ${currentPace}`);
+    // console.log(`handleChangePaceCommand: отправляем предложение смены ритма пользователю ${telegramId}, текущий ритм: ${currentPace}`);
     await sendPaceChangeMessage(telegramId, currentPace);
 
   } catch (error) {
@@ -169,10 +169,10 @@ export async function handleChangePaceCommand(message: any): Promise<void> {
  * Обновляет ритм пользователя в БД и отправляет подтверждение
  */
 export async function handleChangePaceCallback(callbackQuery: any): Promise<void> {
-  console.log("handleChangePaceCallback called", JSON.stringify(callbackQuery));
+  // console.log("handleChangePaceCallback called", JSON.stringify(callbackQuery));
 
   if (!callbackQuery || !callbackQuery.from || !callbackQuery.data) {
-    console.log("handleChangePaceCallback: недостаточно данных в callback");
+    // console.log("handleChangePaceCallback: недостаточно данных в callback");
     return;
   }
 
@@ -188,7 +188,7 @@ export async function handleChangePaceCallback(callbackQuery: any): Promise<void
     } else if (callbackData === CALLBACK_CHANGE_PACE_WEEKLY) {
       selectedPace = AVAILABLE_PACES.WEEKLY;
     } else {
-      console.log(`handleChangePaceCallback: неизвестный callback_data: ${callbackData}`);
+      // console.log(`handleChangePaceCallback: неизвестный callback_data: ${callbackData}`);
       return;
     }
 
@@ -196,7 +196,7 @@ export async function handleChangePaceCallback(callbackQuery: any): Promise<void
     const user = await findUserByTelegramId(telegramId);
     
     if (!user) {
-      console.log(`handleChangePaceCallback: пользователь ${telegramId} не найден`);
+      // console.log(`handleChangePaceCallback: пользователь ${telegramId} не найден`);
       await sendDirectMessage(telegramId, MSG_CHANGE_PACE_NOT_ACTIVE);
       return;
     }

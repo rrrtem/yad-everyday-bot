@@ -2,7 +2,9 @@ import {
   MSG_MODE, 
   MSG_PAYMENT_COND,
   MSG_PROMO,
-  AVAILABLE_MODES
+  AVAILABLE_MODES,
+  CALLBACK_RESET,
+  BUTTON_TEXT_RESET
 } from "../../constants.ts";
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
@@ -27,10 +29,9 @@ export class SetupProcess {
   static async sendModeSelection(telegramId: number): Promise<void> {
     const keyboard = {
       inline_keyboard: [
-        [
-          { text: "📝 Тексты", callback_data: `mode_${AVAILABLE_MODES.TEXT}` },
-          { text: "📸 Картинки", callback_data: `mode_${AVAILABLE_MODES.IMAGE}` }
-        ]
+        [{ text: "📝 Тексты", callback_data: `mode_${AVAILABLE_MODES.TEXT}` }],
+        [{ text: "📸 Картинки", callback_data: `mode_${AVAILABLE_MODES.IMAGE}` }],
+        [{ text: BUTTON_TEXT_RESET, callback_data: CALLBACK_RESET }]
       ]
     };
     
@@ -54,7 +55,8 @@ export class SetupProcess {
     
     const keyboard = {
       inline_keyboard: [
-        [{ text: "💳 У меня нет промокода", callback_data: "no_promo" }]
+        [{ text: "💳 У меня нет промокода", callback_data: "no_promo" }],
+        [{ text: BUTTON_TEXT_RESET, callback_data: CALLBACK_RESET }]
       ]
     };
     

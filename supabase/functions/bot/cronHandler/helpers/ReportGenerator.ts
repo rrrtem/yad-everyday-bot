@@ -1,9 +1,7 @@
 import { ProcessingStats, User } from "./UserProcessor.ts";
 import { ChatManager } from "./ChatManager.ts";
 import { 
-  MSG_DAILY_CRON_REPORT,
   MSG_PUBLIC_DEADLINE_REMINDER,
-  OWNER_TELEGRAM_ID,
   PUBLIC_REMINDER_THREAD_ID_TEXT,
   PUBLIC_REMINDER_THREAD_ID_IMAGE
 } from "../../constants.ts";
@@ -12,20 +10,7 @@ import {
  * Генератор отчетов для крон-задач
  */
 export class ReportGenerator {
-  /**
-   * Отправка ежедневного отчета владельцу
-   */
-  static async sendDailyCronReport(stats: ProcessingStats): Promise<void> {
-    console.log(`📤 Отправляем отчет владельцу (${OWNER_TELEGRAM_ID})`);
-    
-    try {
-      const report = MSG_DAILY_CRON_REPORT(stats);
-      await ChatManager.sendDirectMessage(OWNER_TELEGRAM_ID, report);
-      console.log(`✅ Отчет отправлен владельцу`);
-    } catch (err) {
-      console.error(`❌ Ошибка отправки отчета владельцу:`, err);
-    }
-  }
+
 
   /**
    * Отправка публичных напоминаний
@@ -63,7 +48,7 @@ export class ReportGenerator {
     // Отправляем напоминание для текстовиков
     if (textUsers.length > 0) {
       console.log(`📤 Отправляем напоминание для text пользователей в тред ${PUBLIC_REMINDER_THREAD_ID_TEXT}...`);
-      const usernames = textUsers.map(u => u.username);
+      const usernames = textUsers.map(u => u.username).filter((name): name is string => !!name);
       allUsernames.push(...usernames);
       const text = MSG_PUBLIC_DEADLINE_REMINDER(usernames, timeLeftMsg);
       
@@ -77,7 +62,7 @@ export class ReportGenerator {
     // Отправляем напоминание для картинщиков
     if (imageUsers.length > 0) {
       console.log(`📤 Отправляем напоминание для image пользователей в тред ${PUBLIC_REMINDER_THREAD_ID_IMAGE}...`);
-      const usernames = imageUsers.map(u => u.username);
+      const usernames = imageUsers.map(u => u.username).filter((name): name is string => !!name);
       allUsernames.push(...usernames);
       const text = MSG_PUBLIC_DEADLINE_REMINDER(usernames, timeLeftMsg);
       
@@ -132,18 +117,19 @@ export class ReportGenerator {
    * Вывод финальной статистики в консоль
    */
   static logFinalStats(stats: ProcessingStats, executionTime: number, operation: string): void {
-    console.log(`\n=== ${operation.toUpperCase()} COMPLETED ===`);
-    console.log(`⏱️ Время выполнения: ${executionTime}ms`);
-    console.log(`📊 Итоговая статистика:`);
-    console.log(`   - Активных пользователей: ${stats.totalActive}`);
-    console.log(`   - Отправили посты: ${stats.postsToday}`);
-    console.log(`   - Не отправили: ${stats.noPosts}`);
-    console.log(`   - Новых страйков: ${stats.newStrikes.length}`);
-    console.log(`   - Автопауз: ${stats.autoPaused.length}`);
-    console.log(`   - Удалений: ${stats.pauseExpiredRemoved.length + stats.subscriptionRemoved.length}`);
-    console.log(`   - На паузе: ${stats.currentlyPaused.length}`);
-    console.log(`   - Опасных случаев: ${stats.dangerousCases.length}`);
-    console.log(`🏁 ${operation} завершен успешно в ${new Date().toISOString()}`);
+    // console.log(`\n=== ${operation.toUpperCase()} COMPLETED ===`);
+    // console.log(`⏱️ Время выполнения: ${executionTime}ms`);
+    // console.log(`📊 Итоговая статистика:`);
+    // console.log(`   - Активных пользователей: ${stats.totalActive}`);
+    // console.log(`   - Отправили посты: ${stats.postsToday}`);
+    // console.log(`   - Не отправили: ${stats.noPosts}`);
+    // console.log(`   - Новых страйков: ${stats.newStrikes.length}`);
+    // console.log(`   - Автопауз: ${stats.autoPaused.length}`);
+    // console.log(`   - Удалений: ${stats.pauseExpiredRemoved.length + stats.subscriptionRemoved.length}`);
+    // console.log(`   - На паузе: ${stats.currentlyPaused.length}`);
+    // console.log(`   - Опасных случаев: ${stats.dangerousCases.length}`);
+    // console.log(`🏁 ${operation} завершен успешно в ${new Date().toISOString()}`);
+    console.log(`✅ ${operation} completed in ${executionTime}ms - ${stats.totalActive} active, ${stats.newStrikes.length} strikes, ${stats.autoPaused.length} paused`);
   }
 
   /**
@@ -155,10 +141,11 @@ export class ReportGenerator {
     const weeklyUsers = activeUsers.filter(u => u.pace === "weekly");
     const pausedUsers = users.filter(u => u.pause_until && new Date(u.pause_until) > now);
     
-    console.log(`📈 Предварительная статистика:`);
-    console.log(`   - Всего активных: ${activeUsers.length}`);
-    console.log(`   - Ежедневный ритм: ${dailyUsers.length}`);
-    console.log(`   - Еженедельный ритм: ${weeklyUsers.length}`);
-    console.log(`   - На паузе: ${pausedUsers.length}`);
+    // console.log(`📈 Предварительная статистика:`);
+    // console.log(`   - Всего активных: ${activeUsers.length}`);
+    // console.log(`   - Ежедневный ритм: ${dailyUsers.length}`);
+    // console.log(`   - Еженедельный ритм: ${weeklyUsers.length}`);
+    // console.log(`   - На паузе: ${pausedUsers.length}`);
+    console.log(`📈 Pre-stats: ${activeUsers.length} active (${dailyUsers.length} daily, ${weeklyUsers.length} weekly), ${pausedUsers.length} paused`);
   }
 } 

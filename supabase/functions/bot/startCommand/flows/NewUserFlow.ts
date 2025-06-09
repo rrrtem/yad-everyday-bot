@@ -1,8 +1,9 @@
 import { UserContext } from "../UserAnalyzer.ts";
 import { sendDirectMessage } from "../../userHandler.ts";
 import { SetupProcess } from "../states/SetupProcess.ts";
-import { MSG_WELCOME } from "../../constants.ts";
+import { MSG_WELCOME, MSG_NEW_USER_AUTO_START } from "../../constants.ts";
 import { WaitlistFlow } from "./WaitlistFlow.ts";
+import { registerUser } from "../../userHandler.ts";
 
 /**
  * Flow для новых пользователей
@@ -10,27 +11,30 @@ import { WaitlistFlow } from "./WaitlistFlow.ts";
 export class NewUserFlow {
   
   static async handle(context: UserContext): Promise<void> {
-    const { telegramId, isNewUser } = context;
+    const { telegramId, autoTriggered, originalMessage } = context;
     
-    // Отправляем приветственное сообщение
-    if (isNewUser) {
-      await sendDirectMessage(telegramId, MSG_WELCOME);
+    if (autoTriggered && originalMessage) {
+      // console.log(`NewUserFlow: Пользователь ${telegramId} написал "${originalMessage}" - автозапуск /start`);
+      
+      // Отправляем сообщение о автозапуске перед приветствием
+      await sendDirectMessage(telegramId, MSG_NEW_USER_AUTO_START);
     } else {
-      // Существующий в БД, но новый для чата пользователь
+      // Отправляем обычное приветствие для новых пользователей
       await sendDirectMessage(telegramId, MSG_WELCOME);
     }
-    
-    // Проверяем, есть ли свободные места
+
+    // Проверяем и создаем пользователя
+    await registerUser(context.telegramUserData);
+
+    // Проверяем, нужно ли добавлять в waitlist
     const shouldWaitlist = await WaitlistFlow.shouldAddToWaitlist();
-    console.log(`NewUserFlow: shouldWaitlist=${shouldWaitlist}`);
+    // console.log(`NewUserFlow: shouldWaitlist=${shouldWaitlist}`);
     
     if (shouldWaitlist) {
-      // Нет свободных мест - добавляем в waitlist
-      console.log(`NewUserFlow: Добавляем пользователя ${telegramId} в waitlist`);
+      // console.log(`NewUserFlow: Добавляем пользователя ${telegramId} в waitlist`);
       await WaitlistFlow.handle(context);
     } else {
-      // Есть свободные места - запускаем процесс настройки режима
-      console.log(`NewUserFlow: Есть свободные места, запускаем настройку для пользователя ${telegramId}`);
+      // console.log(`NewUserFlow: Есть свободные места, запускаем настройку для пользователя ${telegramId}`);
       await SetupProcess.startModeSelection(telegramId);
     }
   }

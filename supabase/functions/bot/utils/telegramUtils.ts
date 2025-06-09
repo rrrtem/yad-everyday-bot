@@ -10,55 +10,55 @@ export async function removeUserFromChatWithoutBan(userId: number, groupChatId: 
   const TELEGRAM_API = `https://api.telegram.org/bot${telegramBotToken}`;
   
   try {
-    console.log(`🔄 Удаляем пользователя ${userId} из чата ${groupChatId}...`);
+    // console.log(`🚀 Начинаю процесс удаления пользователя ${userId} из чата без постоянного бана`);
     
-    // Шаг 1: Банируем пользователя (это удаляет его из чата)
-    const banResponse = await fetch(`${TELEGRAM_API}/banChatMember`, {
-      method: "POST", 
+    // Шаг 1: Кикаем пользователя из чата (временный бан)
+    const kickResponse = await fetch(`${TELEGRAM_API}/banChatMember`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: groupChatId,
         user_id: userId,
-        revoke_messages: false // Не удаляем его сообщения
+        revoke_messages: false
       })
     });
     
-    if (!banResponse.ok) {
-      const banErrorText = await banResponse.text();
-      throw new Error(`Ошибка бана пользователя: ${banResponse.status} - ${banErrorText}`);
+    if (!kickResponse.ok) {
+      const kickErrorText = await kickResponse.text();
+      console.error(`❌ Ошибка кика пользователя ${userId}: ${kickResponse.status} - ${kickErrorText}`);
+      throw new Error(`Failed to kick user: ${kickResponse.status} - ${kickErrorText}`);
     }
     
-    console.log(`✅ Шаг 1: Пользователь ${userId} забанен (удален из чата)`);
+    // console.log(`✅ Шаг 1: Пользователь ${userId} временно забанен (кикнут из чата)`);
     
-    // Шаг 2: Разбанируем пользователя (чтобы он мог вернуться по ссылке)
-    // Небольшая задержка перед разбаном для надежности
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // Ждем немного перед разбаном
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
+    // Шаг 2: Разбаниваем пользователя (снимаем ограничения)
     const unbanResponse = await fetch(`${TELEGRAM_API}/unbanChatMember`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: groupChatId,
         user_id: userId,
-        only_if_banned: true // Разбанить только если действительно забанен
+        only_if_banned: true
       })
     });
     
     if (!unbanResponse.ok) {
       const unbanErrorText = await unbanResponse.text();
-      console.warn(`⚠️ Первая попытка разбана пользователя ${userId} не удалась: ${unbanResponse.status} - ${unbanErrorText}`);
+      console.error(`⚠️ Ошибка разбана пользователя ${userId} с первой попытки: ${unbanResponse.status} - ${unbanErrorText}`);
       
-      // Повторная попытка разбана без флага only_if_banned
-      console.log(`🔄 Повторная попытка разбана пользователя ${userId}...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Повторная попытка разбана (иногда требуется)
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       const retryUnbanResponse = await fetch(`${TELEGRAM_API}/unbanChatMember`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: groupChatId,
-          user_id: userId
-          // Убираем only_if_banned для повторной попытки
+          user_id: userId,
+          only_if_banned: false // Пробуем без условия
         })
       });
       
@@ -67,13 +67,13 @@ export async function removeUserFromChatWithoutBan(userId: number, groupChatId: 
         console.error(`❌ Критическая ошибка: не удалось разбанить пользователя ${userId} даже после повторной попытки: ${retryUnbanResponse.status} - ${retryErrorText}`);
         console.error(`🚨 ВНИМАНИЕ: Пользователь ${userId} может быть постоянно забанен и не сможет вернуться по ссылке!`);
       } else {
-        console.log(`✅ Шаг 2 (повторная попытка): Пользователь ${userId} разбанен (может вернуться по invite ссылке)`);
+        // console.log(`✅ Шаг 2 (повторная попытка): Пользователь ${userId} разбанен (может вернуться по invite ссылке)`);
       }
     } else {
-      console.log(`✅ Шаг 2: Пользователь ${userId} разбанен (может вернуться по invite ссылке)`);
+      // console.log(`✅ Шаг 2: Пользователь ${userId} разбанен (может вернуться по invite ссылке)`);
     }
     
-    console.log(`🎯 Пользователь ${userId} успешно удален из чата БЕЗ постоянного бана`);
+    console.log(`✅ User ${userId} removed from chat without permanent ban`);
   } catch (err) {
     console.error(`❌ Ошибка удаления пользователя ${userId} без бана:`, err);
     throw err;

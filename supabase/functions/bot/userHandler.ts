@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { DEFAULT_STRIKES_COUNT } from "./constants.ts";
+import { BotMenuManager } from "./utils/botMenuManager.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -14,8 +15,9 @@ const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /**
  * Отправляет прямое сообщение пользователю (по telegram_id).
+ * @returns ID отправленного сообщения или null в случае ошибки
  */
-export async function sendDirectMessage(telegramId: number, text: string): Promise<void> {
+export async function sendDirectMessage(telegramId: number, text: string): Promise<number | null> {
   try {
     const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: "POST",
@@ -29,29 +31,119 @@ export async function sendDirectMessage(telegramId: number, text: string): Promi
     const respJson = await response.json();
     if (!respJson.ok) {
       console.error(`Error sending DM to ${telegramId}: ${respJson.description}`);
+      return null;
     } else {
       console.log(`DM sent to ${telegramId}: "${text}"`);
+      return respJson.result?.message_id || null;
     }
   } catch (error) {
     console.error(`Failed to send DM to ${telegramId}:`, error);
+    return null;
   }
 }
 
 /**
- * Отправляет сообщение статуса с кнопками для Tribute и поддержки
+ * Удаляет сообщение пользователя
  */
-export async function sendStatusMessageWithButtons(telegramId: number, statusMessage: string): Promise<void> {
+export async function deleteMessage(telegramId: number, messageId: number): Promise<boolean> {
   try {
-    const { TRIBUTE_BOT_LINK, ADMIN_CONTACT } = await import("./constants.ts");
+    const response = await fetch(`${TELEGRAM_API}/deleteMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: telegramId,
+        message_id: messageId
+      }),
+    });
+    const respJson = await response.json();
+    if (!respJson.ok) {
+      console.error(`Error deleting message ${messageId} for ${telegramId}: ${respJson.description}`);
+      return false;
+    } else {
+      console.log(`Message ${messageId} deleted for ${telegramId}`);
+      return true;
+    }
+  } catch (error) {
+    console.error(`Failed to delete message ${messageId} for ${telegramId}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Отправляет сообщение с автоматическим удалением предыдущего сообщения того же типа
+ * @param telegramId - ID пользователя Telegram
+ * @param text - текст сообщения
+ * @param messageType - тип сообщения ('daily' или 'milestone')
+ * @returns ID нового отправленного сообщения или null
+ */
+export async function sendMessageWithAutoDelete(telegramId: number, text: string, messageType: 'daily' | 'milestone'): Promise<number | null> {
+  try {
+    // Получаем текущего пользователя для проверки предыдущих сообщений
+    const user = await findUserByTelegramId(telegramId);
+    if (!user) {
+      console.error(`sendMessageWithAutoDelete: пользователь ${telegramId} не найден`);
+      return await sendDirectMessage(telegramId, text);
+    }
+
+    // Определяем поле для хранения ID сообщения
+    const messageIdField = messageType === 'daily' ? 'last_daily_message_id' : 'last_milestone_message_id';
+    const previousMessageId = user[messageIdField];
+
+    // Удаляем предыдущее сообщение, если оно существует
+    if (previousMessageId) {
+      console.log(`sendMessageWithAutoDelete: удаляем предыдущее ${messageType} сообщение ${previousMessageId} для пользователя ${telegramId}`);
+      await deleteMessage(telegramId, previousMessageId);
+    }
+
+    // Отправляем новое сообщение
+    const newMessageId = await sendDirectMessage(telegramId, text);
     
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "💳 Подписка и платежи", url: TRIBUTE_BOT_LINK },
-          { text: "🆘 Поддержка", url: `https://t.me/${ADMIN_CONTACT.replace('@', '')}` }
-        ]
-      ]
-    };
+    if (newMessageId) {
+      // Сохраняем ID нового сообщения в БД
+      const updateData = {
+        [messageIdField]: newMessageId,
+        updated_at: new Date().toISOString()
+      };
+      
+      const { error } = await supabase
+        .from("users")
+        .update(updateData)
+        .eq("telegram_id", telegramId);
+        
+      if (error) {
+        console.error(`sendMessageWithAutoDelete: ошибка сохранения message_id для ${telegramId}:`, error.message);
+      } else {
+        console.log(`sendMessageWithAutoDelete: сохранен ${messageType} message_id ${newMessageId} для пользователя ${telegramId}`);
+      }
+    }
+
+    return newMessageId;
+  } catch (error) {
+    console.error(`sendMessageWithAutoDelete: ошибка для пользователя ${telegramId}:`, error);
+    // Fallback - отправляем обычное сообщение
+    return await sendDirectMessage(telegramId, text);
+  }
+}
+
+/**
+ * Отправляет сообщение статуса с адаптивными кнопками
+ */
+export async function sendStatusMessageWithButtons(telegramId: number, statusMessage: string, user?: any): Promise<void> {
+  try {
+    const { generateStatusKeyboard } = await import("./utils/statusMessageGenerator.ts");
+    
+    // Если пользователь не передан, получаем его из БД
+    let userData = user;
+    if (!userData) {
+      userData = await findUserByTelegramId(telegramId);
+      if (!userData) {
+        console.error(`sendStatusMessageWithButtons: пользователь ${telegramId} не найден`);
+        await sendDirectMessage(telegramId, statusMessage);
+        return;
+      }
+    }
+    
+    const keyboard = await generateStatusKeyboard(userData);
     
     const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: "POST",
@@ -142,6 +234,10 @@ export async function registerUser(telegramUser: any) {
     return null;
   }
   console.log("registerUser success", userData);
+  
+  // Обновляем меню для нового пользователя
+  await BotMenuManager.updateUserMenu(telegramUser.id);
+  
   return userData;
 }
 
@@ -266,6 +362,9 @@ export async function updateUserFromChatMember(chatMemberUpdate: any) {
     console.error("Ошибка при обновлении пользователя:", error.message);
   } else {
     console.log(`Пользователь ${telegramId} (${firstName}) — статус: ${inChat ? "в группе" : "вышел"}. Данные обновлены.`);
+    
+    // Обновляем меню пользователя после изменения статуса
+    await BotMenuManager.updateUserMenu(telegramId);
   }
 }
 

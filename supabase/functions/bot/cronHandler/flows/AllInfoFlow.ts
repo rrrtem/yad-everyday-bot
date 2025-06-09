@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { UserProcessor, ProcessingStats } from "../helpers/UserProcessor.ts";
 import { ReportGenerator } from "../helpers/ReportGenerator.ts";
+import { AdminReporter } from "../helpers/AdminReporter.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -29,31 +30,27 @@ export class AllInfoFlow {
     const now = new Date();
     const startTime = Date.now();
     
-    console.log(`\n=== ALL INFO STARTED ===`);
-    console.log(`🕐 Время запуска: ${now.toISOString()}`);
+    console.log(`ℹ️ AllInfo started at ${now.toISOString()}`);
     
     try {
-      // Получаем всех пользователей для анализа
-      console.log(`📊 Получаем данные пользователей из БД...`);
+      // Получаем всех пользователей без обработки
       const users = await this.userProcessor.getAllUsers();
-      console.log(`✅ Загружено ${users.length} записей пользователей для анализа`);
+      console.log(`📊 Loaded ${users.length} users for analysis`);
       
-      // Собираем статистику как в dailyCron, но без изменения данных
+      // Анализируем статистику
       const stats = this.analyzeUsersStats(users, now);
 
-      // Отправляем отчет
-      console.log(`📤 Отправляем отчет владельцу...`);
-      await ReportGenerator.sendDailyCronReport(stats);
-      console.log(`✅ Отчет успешно отправлен`);
+      // Отправляем отчет владельцу
+      await AdminReporter.sendDailyCronReport(stats, 'allinfo', users);
 
       // Финальная статистика
       const endTime = Date.now();
       const executionTime = endTime - startTime;
       
-      ReportGenerator.logFinalStats(stats, executionTime, "allInfo");
+      console.log(`✅ AllInfo completed in ${executionTime}ms`);
 
       return new Response(JSON.stringify({
-        message: "allInfo отчет отправлен",
+        message: "allInfo завершён",
         executionTime,
         stats
       }), { status: 200, headers: { "Content-Type": "application/json" } });

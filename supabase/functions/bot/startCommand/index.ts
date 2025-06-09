@@ -5,17 +5,19 @@ import { ContinueSetupFlow } from "./flows/ContinueSetupFlow.ts";
 import { ActiveUserFlow } from "./flows/ActiveUserFlow.ts";
 import { WaitlistFlow } from "./flows/WaitlistFlow.ts";
 import { UserAnalyzer } from "./UserAnalyzer.ts";
+import { CALLBACK_RESET } from "../constants.ts";
 
 /**
  * Главный обработчик команды /start
  * Определяет тип пользователя и делегирует обработку соответствующему Flow
  */
-export async function handleStartCommand(message: any): Promise<void> {
+export async function handleStartCommand(message: any, autoTriggered: boolean = false): Promise<void> {
   const telegramId = message.from.id;
+  const originalMessage = autoTriggered ? (message.text || message.caption) : undefined;
   
   // Шаг 1: Анализ пользователя
   const analyzer = new UserAnalyzer();
-  const userContext = await analyzer.analyze(telegramId, message.from);
+  const userContext = await analyzer.analyze(telegramId, message.from, autoTriggered, originalMessage);
   
   // Шаг 2: Делегирование обработки соответствующему Flow
   switch (userContext.flowType) {
@@ -61,6 +63,8 @@ export async function handleStartCallbackQuery(callbackQuery: any): Promise<void
     await StateHandlers.handleNoPromo(telegramId);
   } else if (data === "have_promo") {
     await StateHandlers.handleHavePromo(telegramId);
+  } else if (data === CALLBACK_RESET) {
+    await StateHandlers.handleReset(telegramId);
   }
   
   // Отвечаем на callback query
@@ -77,4 +81,4 @@ export async function handleStartCallbackQuery(callbackQuery: any): Promise<void
 }
 
 // Дополнительные экспорты для удобства импорта
-export { handleModeSelection, handlePromoCode, handleNoPromo, handleHavePromo } from "./states/index.ts"; 
+export { handleModeSelection, handlePromoCode, handleNoPromo, handleHavePromo, handleReset } from "./states/index.ts"; 

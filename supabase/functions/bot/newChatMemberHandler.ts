@@ -114,11 +114,11 @@ export async function handleNewChatMember(chatMemberUpdate: any): Promise<void> 
   // Шаг 4: Получаем обновлённые данные пользователя и отправляем подробное сообщение о статусе
   try {
     const updatedUser = await findUserByTelegramId(telegramId);
-    if (updatedUser) {
-      const statusMessage = MSG_CHAT_MEMBER_STATUS(updatedUser);
-      await sendStatusMessageWithButtons(telegramId, statusMessage);
-      console.log(`handleNewChatMember: отправлено сообщение о статусе с кнопками пользователю ${telegramId}`);
-    }
+          if (updatedUser) {
+        const statusMessage = MSG_CHAT_MEMBER_STATUS(updatedUser);
+        await sendStatusMessageWithButtons(telegramId, statusMessage, updatedUser);
+        console.log(`handleNewChatMember: отправлено сообщение о статусе с кнопками пользователю ${telegramId}`);
+      }
   } catch (statusError) {
     console.error(`handleNewChatMember: ошибка отправки сообщения о статусе пользователю ${telegramId}:`, statusError);
     // Не критичная ошибка, не прерываем выполнение

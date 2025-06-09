@@ -1,3 +1,6 @@
+// Импорты
+import { generateUserStatusMessage } from './utils/statusMessageGenerator.ts';
+
 // =====================================================
 // ЧИСЛОВЫЕ ПАРАМЕТРЫ И НАСТРОЙКИ
 // =====================================================
@@ -74,6 +77,26 @@ export const PROMO_TYPES = {
 // Количество бесплатных дней для промокода FREE10
 export const FREE_PROMO_DAYS = 10;
 
+// =====================================================
+// КОМАНДЫ МЕНЮ БОТА
+// =====================================================
+
+// Описания команд для пользователей НЕ в чате
+export const MENU_CMD_START = "❤️‍🔥 Начать участие";
+
+// Описания команд для пользователей В чате
+export const MENU_CMD_STATUS = "👀 Мой статус";
+export const MENU_CMD_CHANGE_MODE = "🌗 Изменить режим";
+export const MENU_CMD_CHANGE_PACE = "💨 Изменить ритм";
+export const MENU_CMD_PAUSE = "😴 Каникулы";
+export const MENU_CMD_TRIBUTE = "💳 Подписка";
+
+// Динамические описания команд напоминаний
+export const MENU_CMD_REMINDER_ENABLE = "🔔 Включить напоминания";
+export const MENU_CMD_REMINDER_DISABLE = "🔕 Выключить напоминания";
+
+// Fallback команда для напоминаний
+export const MENU_CMD_REMINDER_GENERIC = "👺 Напоминания";
 
 // =====================================================
 // СООБЩЕНИЯ: КОМАНДА /START (порядок по сценарию A1)
@@ -85,6 +108,19 @@ export const MSG_WELCOME = `Привет! Я бот практики «Кажд�
 
 Я буду помогать тебе участвовать в проекте: присылать напоминания о дедлайнах, следить за активностью и пропусками.
 Если возникнут вопросы или что-то пойдет не так — пиши @rrrtem.`;
+
+export const MSG_NEW_USER_AUTO_START = `Привет! Я бот практики «Каждый день» от сообщества <a href="https://www.instagram.com/clarity.and.movement/">«Ясность&Движение»</a>. 
+
+Здесь мы каждый день пишем тексты или делаем картинки, но в будущем добавятся и другие направления. 
+
+Я буду помогать тебе участвовать в проекте: присылать напоминания о дедлайнах, следить за активностью и пропусками.
+Если возникнут вопросы или что-то пойдет не так — пиши @rrrtem.`;
+
+export const MSG_CONTINUE_SETUP_HINT = `ℹ️ Ты уже в процессе настройки участия. 
+
+Используй кнопки выше или команду /reset чтобы начать заново.`;
+
+export const MSG_ACTIVE_USER_STATUS_HINT = `👋 Привет! Вот твой текущий статус участия:`;
 
 export const MSG_WELCOME_RETURNING = (hasSavedDays: boolean, daysLeft?: number) => {
   let message = `Мы очень рады твоему возвращению! `;
@@ -218,11 +254,18 @@ export const MSG_CONTINUE_PAYMENT_PENDING = (paymentLink: string) => `💳 Ты 
 export const MSG_RESET_SUCCESS = `Настройки сброшены! Теперь ты можешь начать процесс настройки участия заново — /start.`;
 
 // =====================================================
+// КНОПКИ И CALLBACK DATA
+// =====================================================
+
+export const CALLBACK_RESET = "reset_start";
+export const BUTTON_TEXT_RESET = "🔄 Начать заново";
+
+// =====================================================
 // СООБЩЕНИЯ: ОБРАБОТКА ПОСТОВ #DAILY
 // =====================================================
 
 export const MSG_DAILY_ACCEPTED = (totalPosts: number, consecutivePosts: number) => {
-  let message = "Текст принят! Ура и до завтра.";
+  let message = "Принято!";
   
   // Добавляем информацию о последовательных постах
   if (consecutivePosts > 0) {
@@ -321,11 +364,9 @@ export const MSG_PAUSE_SET = (days: number, endDate: string) =>
 export const MSG_PAUSE_ALREADY_ON = (endDate: string) => 
 `⏸️ Ты уже на паузе до ${endDate}.
 
-Если хочешь изменить срок паузы, сначала сними текущую командой /unpause`;
+Если хочешь досрочно выйти с каникул, просто пришли пост обычный пост с тегом в чат.`;
 
-export const MSG_UNPAUSE_SUCCESS = `✅ Пауза снята! Добро пожаловать обратно к активному участию.
-
-Теперь снова будут начисляться страйки за пропуски и приходить напоминания.`;
+export const MSG_UNPAUSE_SUCCESS = `Пауза снята! Теперь снова будут начисляться страйки за пропуски и приходить напоминания.`;
 
 export const MSG_UNPAUSE_NOT_ON_PAUSE = `ℹ️ Ты не на паузе. Команда /unpause используется только для снятия активной паузы.`;
 
@@ -352,131 +393,37 @@ export const MSG_CHANGE_MODE_SUCCESS = (newMode: string, threadInfo?: string) =>
 };
 
 export const MSG_CHANGE_MODE_SAME = (currentMode: string) => 
-`ℹ️ Ты уже участвуешь в режиме **${currentMode === 'text' ? 'Тексты' : 'Картинки'}**.
-
-Если хочешь изменить ритм участия, используй команду /change_pace`;
+`ℹ️ Ты уже участвуешь в режиме **${currentMode === 'text' ? 'Тексты' : 'Картинки'}**.`;
 
 export const MSG_CHANGE_MODE_NOT_ACTIVE = `❌ Команда доступна только активным участникам.
 
 Чтобы начать участие, используй команду /start`;
 
+export const MSG_CHANGE_MODE_ALL_SET = `ℹ️ Все доступные режимы уже настроены.
+
+В будущем появятся новые режимы для переключения!`;
+
 // =====================================================
 // СООБЩЕНИЯ: КОМАНДА /CHANGE_PACE
 // =====================================================
 
-export const MSG_CHANGE_PACE_CURRENT_DAILY = `Челлендж заточен на регулярность, но мы понимаем, что иногда важно менять свой ритм.
+export const MSG_CHANGE_PACE_CURRENT_DAILY = `Одна из главных задач нашей практики — это регулярность. Но мы понимаем, что иногда важно менять свой ритм. Если энергия кончается, то лучше перейти на более спокойный режим, а потом вернуться.
+`;
 
-Сейчас ты участвуешь в режиме "Каждый день". Можешь переключиться на режим, в котором мы будем ждать твоих обновлений раз в неделю.`;
+export const MSG_CHANGE_PACE_CURRENT_WEEKLY = `Хочешь вернуться к ежедневному ритму?`;
 
-export const MSG_CHANGE_PACE_CURRENT_WEEKLY = `Челлендж заточен на регулярность, но мы понимаем, что иногда важно менять свой ритм.
+export const MSG_CHANGE_PACE_SUCCESS_TO_WEEKLY = `Супер! Теперь мы будем ждать твои посты раз в неделю.`;
 
-Сейчас ты участвуешь в режиме "Раз в неделю". Можешь вернуться к ежедневному ритму.`;
-
-export const MSG_CHANGE_PACE_SUCCESS_TO_WEEKLY = `Супер! Теперь твой ритм изменился на "Раз в неделю".
-
-Мы будем ждать твои посты раз в неделю.`;
-
-export const MSG_CHANGE_PACE_SUCCESS_TO_DAILY = `Супер! Теперь твой ритм изменился на "Каждый день".
-
-Мы будем ждать твои посты ежедневно.`;
+export const MSG_CHANGE_PACE_SUCCESS_TO_DAILY = `Ты вернеулся в режим "Каждый день"!`;
 
 export const MSG_CHANGE_PACE_NOT_ACTIVE = `❌ Команда доступна только активным участникам.
-
 Чтобы начать участие, используй команду /start`;
 
 // =====================================================
 // ОТЧЕТЫ И СТАТИСТИКА
 // =====================================================
 
-export const MSG_DAILY_CRON_REPORT = (stats: any) => {
-  let report = "📊 Ежедневный отчет dailyCron:\n\n";
-  
-  // Общая статистика
-  report += `👥 Общая статистика:\n`;
-  report += `• Активных участников: ${stats.totalActive}\n`;
-  report += `• Прислали пост сегодня: ${stats.postsToday}\n`;
-  report += `• Не прислали пост: ${stats.noPosts}\n\n`;
-  
-  // Страйки и риски
-  if (stats.newStrikes.length > 0) {
-    report += `⚠️ Новые страйки:\n`;
-    stats.newStrikes.forEach((user: any) => {
-      report += `• @${user.username} — ${user.strikes} страйк(а)\n`;
-    });
-    report += `\n`;
-  }
-  
-  if (stats.riskyUsers.length > 0) {
-    report += `🚨 На грани исключения (3 страйка):\n`;
-    stats.riskyUsers.forEach((user: any) => {
-      report += `• @${user.username}\n`;
-    });
-    report += `\n`;
-  }
-  
-  if (stats.autoPaused.length > 0) {
-    report += `⏸️ Автоматически ушли на паузу:\n`;
-    stats.autoPaused.forEach((user: any) => {
-      report += `• @${user.username}\n`;
-    });
-    report += `\n`;
-  }
-  
-  // Паузы
-  if (stats.pauseCompleted.length > 0) {
-    report += `✅ Завершили паузу:\n`;
-    stats.pauseCompleted.forEach((user: any) => {
-      report += `• @${user.username}\n`;
-    });
-    report += `\n`;
-  }
-  
-  if (stats.pauseExpiredRemoved.length > 0) {
-    report += `❌ Удалены после истечения паузы:\n`;
-    stats.pauseExpiredRemoved.forEach((user: any) => {
-      report += `• @${user.username}\n`;
-    });
-    report += `\n`;
-  }
-  
-  if (stats.currentlyPaused.length > 0) {
-    report += `😴 Сейчас на паузе:\n`;
-    stats.currentlyPaused.forEach((user: any) => {
-      report += `• @${user.username} (до ${user.pauseUntil})\n`;
-    });
-    report += `\n`;
-  }
-  
-  // Подписки
-  if (stats.subscriptionWarnings.length > 0) {
-    report += `💳 Предупреждения о подписке:\n`;
-    stats.subscriptionWarnings.forEach((user: any) => {
-      report += `• @${user.username} — ${user.daysLeft} дней осталось\n`;
-    });
-    report += `\n`;
-  }
-  
-  if (stats.subscriptionRemoved.length > 0) {
-    report += `🚫 Удалены из-за окончания подписки:\n`;
-    stats.subscriptionRemoved.forEach((user: any) => {
-      report += `• @${user.username}\n`;
-    });
-    report += `\n`;
-  }
-  
-  // Опасные случаи
-  if (stats.dangerousCases.length > 0) {
-    report += `🔴 ТРЕБУЮТ ВНИМАНИЯ:\n`;
-    stats.dangerousCases.forEach((user: any) => {
-      report += `• @${user.username} — ${user.reason}\n`;
-    });
-    report += `\n`;
-  }
-  
-  report += `✅ Отчет завершен в ${new Date().toLocaleString('ru-RU', { timeZone: 'UTC' })} UTC`;
-  
-  return report;
-};
+
 
 // =====================================================
 // СООБЩЕНИЯ: АВТОМАТИЧЕСКИЕ НАПОМИНАНИЯ И ШТРАФЫ
@@ -553,87 +500,7 @@ export const MSG_SUBSCRIPTION_EXPIRED_NOTIFICATION = (expiresAt: string, daysLef
 // СООБЩЕНИЯ: СТАТУС ПОЛЬЗОВАТЕЛЯ ПРИ ВХОДЕ В ЧАТ
 // =====================================================
 
-export const MSG_CHAT_MEMBER_STATUS = (user: any) => {
-  const now = new Date();
-  let statusMessage = `Все важное про участие в практике\n\n`;
-
-  // Информация о подписке - проверяем разные состояния
-
-  // Состояние 4: Пользователь не в чате
-  if (user.is_in_chat === false || user.in_chat === false) {
-    statusMessage += `❌ Ты не находишься в чате участников\n`;
-    if (user.subscription_days_left > 0) {
-      // Вычисляем до какой даты действуют сохранённые дни
-      const savedDaysEndDate = new Date(now);
-      savedDaysEndDate.setDate(savedDaysEndDate.getDate() + user.subscription_days_left);
-      statusMessage += `• У тебя есть ${user.subscription_days_left} ${pluralizeDays(user.subscription_days_left)} с прошлой подписки\n`;
-      statusMessage += `• Действуют до: ${savedDaysEndDate.toLocaleDateString('ru-RU')}\n`;
-    } else {
-      statusMessage += `• Сохранённых дней нет\n`;
-    }
-    statusMessage += `\n`;
-  }
-  // Состояние 1: Есть сохранённые дни, активной подписки нет
-  else if (user.subscription_days_left > 0 && !user.subscription_active) {
-    // Вычисляем до какой даты действуют сохранённые дни
-    const savedDaysEndDate = new Date(now);
-    savedDaysEndDate.setDate(savedDaysEndDate.getDate() + user.subscription_days_left);
-    
-    statusMessage += `💰 Используются сохранённые дни с прошлой подписки\n`;
-    statusMessage += `• Осталось дней: ${user.subscription_days_left}\n`;
-    statusMessage += `• Действуют до: ${savedDaysEndDate.toLocaleDateString('ru-RU')}\n`;
-    statusMessage += `• Новая подписка в Tribute пока не нужна\n\n`;
-  }
-  // Состояние 2: Есть активная подписка, сохранённых дней нет
-  else if (user.subscription_active && user.subscription_days_left === 0) {
-    statusMessage += `✅ Подписка активна\n`;
-    if (user.expires_at) {
-      const expiresDate = new Date(user.expires_at);
-      const daysLeft = Math.ceil((expiresDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      statusMessage += `• Действует до: ${expiresDate.toLocaleDateString('ru-RU')}\n`;
-      statusMessage += `• Осталось дней: ${daysLeft > 0 ? daysLeft : 0}\n`;
-    }
-    statusMessage += `\n`;
-  }
-  // Смешанное состояние: и подписка активна, и есть сохранённые дни
-  else if (user.subscription_active && user.subscription_days_left > 0) {
-    statusMessage += `✅ Подписка активна + есть сохранённые дни\n`;
-    if (user.expires_at) {
-      const expiresDate = new Date(user.expires_at);
-      const daysLeft = Math.ceil((expiresDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      statusMessage += `• Активная подписка до: ${expiresDate.toLocaleDateString('ru-RU')} (${daysLeft > 0 ? daysLeft : 0} дней)\n`;
-    }
-    statusMessage += `• Плюс сохранённые дни: ${user.subscription_days_left} ${pluralizeDays(user.subscription_days_left)}\n`;
-    statusMessage += `\n`;
-  }
-  // Состояние 3: Непонятное состояние - нет ни подписки, ни сохранённых дней
-  else {
-    statusMessage += `❓ Статус подписки неопределён\n`;
-    statusMessage += `• Активной подписки: ${user.subscription_active ? 'да' : 'нет'}\n`;
-    statusMessage += `• Сохранённых дней: ${user.subscription_days_left || 0}\n`;
-    statusMessage += `• Возможно, данные ещё не обновились\n\n`;
-  }
-  statusMessage += `\n`;
-
-  
-  // Статус активности
-  statusMessage += `• Режим: ${user.mode === 'text' ? 'Тексты' : user.mode === 'image' ? 'Картинки' : '❓ Не выбран'}\n`;
-  statusMessage += `• Ритм: ${user.pace === 'daily' ? 'Каждый день' : user.pace === 'weekly' ? 'Раз в неделю' : '❓ Не выбран'}\n`;
-  
-
-  // Активность в челлендже (показываем только если есть посты)
-  if (user.units_count > 0) {
-    statusMessage += `• Всего постов: ${user.units_count}\n`;
-    statusMessage += `• Пропусков подряд: ${user.strikes_count || 0}\n`;
-    if (user.last_post_date) {
-      const lastPostDate = new Date(user.last_post_date);
-      statusMessage += `• Последний пост: ${lastPostDate.toLocaleDateString('ru-RU')}\n`;
-    }
-    statusMessage += `\n`;
-  }
-  
-  return statusMessage;
-};
+export const MSG_CHAT_MEMBER_STATUS = generateUserStatusMessage;
 
 // =====================================================
 // CALLBACK DATA ДЛЯ КНОПОК
@@ -660,7 +527,40 @@ export const CALLBACK_CHANGE_MODE_IMAGE = "change_mode:image";
 
 // Callback data для кнопок смены ритма
 export const CALLBACK_CHANGE_PACE_DAILY = "change_pace:daily";
-export const CALLBACK_CHANGE_PACE_WEEKLY = "change_pace:weekly"; 
+export const CALLBACK_CHANGE_PACE_WEEKLY = "change_pace:weekly";
+
+// Callback data для кнопок паузы
+export const CALLBACK_PAUSE = "pause";
+export const CALLBACK_UNPAUSE = "unpause";
+
+// Callback data для кнопок напоминаний
+export const CALLBACK_DISABLE_REMINDERS = "disable_reminders";
+export const CALLBACK_ENABLE_REMINDERS = "enable_reminders";
+export const CALLBACK_TOGGLE_PUBLIC_REMINDER = "toggle_public_reminder";
+
+// Callback data для выбора режима/ритма когда не установлены
+export const CALLBACK_CHOOSE_MODE = "choose_mode";
+export const CALLBACK_CHOOSE_PACE = "choose_pace";
+
+// Callback data для новых упрощенных кнопок
+export const CALLBACK_CHANGE_MODE = "change_mode";
+export const CALLBACK_CHANGE_PACE = "change_pace";
+export const CALLBACK_CHANGE_PUBLIC_REMINDER = "change_public_reminder";
+
+// =====================================================
+// ПОЛЯ БД ДЛЯ ХРАНЕНИЯ MESSAGE ID
+// =====================================================
+
+// Поля для хранения ID сообщений, которые нужно удалять при обновлении
+export const DB_FIELD_LAST_DAILY_MESSAGE_ID = "last_daily_message_id";
+export const DB_FIELD_LAST_MILESTONE_MESSAGE_ID = "last_milestone_message_id";
+
+// =====================================================
+// СООБЩЕНИЯ: УПРАВЛЕНИЕ НАПОМИНАНИЯМИ
+// =====================================================
+
+export const MSG_REMINDERS_ENABLED = "🔔 Напоминания включены. Теперь ты будешь получать публичные напоминания о дедлайнах.";
+export const MSG_REMINDERS_DISABLED = "🔕 Напоминания отключены. Больше не будешь получать публичные напоминания о дедлайнах."; 
 
 
 

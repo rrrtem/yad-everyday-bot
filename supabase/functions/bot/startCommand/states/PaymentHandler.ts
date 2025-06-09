@@ -10,7 +10,9 @@ import {
   CHALLENGE_JOIN_LINK,
   CALLBACK_PAYMENT_CLUB,
   CALLBACK_PAYMENT_STANDARD,
-  CALLBACK_JOIN_CHAT
+  CALLBACK_JOIN_CHAT,
+  CALLBACK_RESET,
+  BUTTON_TEXT_RESET
 } from "../../constants.ts";
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
@@ -87,7 +89,8 @@ export class PaymentHandler {
       const keyboard = {
         inline_keyboard: [
           [{ text: "💳 Перейти к оплате", url: DEFAULT_PAYMENT_URL }],
-          [{ text: "🎫 У меня есть промокод", callback_data: "have_promo" }]
+          [{ text: "🎫 У меня есть промокод", callback_data: "have_promo" }],
+          [{ text: BUTTON_TEXT_RESET, callback_data: CALLBACK_RESET }]
         ]
       };
       
@@ -116,7 +119,9 @@ export class PaymentHandler {
     try {
       const keyboard = {
         inline_keyboard: [
-          [{ text: "💳 Перейти к оплате (спец. цена)", url: SPECIAL_PAYMENT_URL }]
+          [{ text: "💳 Перейти к оплате (спец. цена)", url: SPECIAL_PAYMENT_URL }],
+          [{ text: "🎫 У меня есть промокод", callback_data: "have_promo" }],
+          [{ text: BUTTON_TEXT_RESET, callback_data: CALLBACK_RESET }]
         ]
       };
       

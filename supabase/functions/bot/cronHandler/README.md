@@ -8,11 +8,13 @@
 cronHandler/
 ├── flows/                    # Основные потоки крон-задач
 │   ├── DailyCronFlow.ts     # Ежедневная проверка (04:00 UTC)
+│   ├── WeeklyCronFlow.ts    # Еженедельная проверка для weekly пользователей
 │   ├── PublicReminderFlow.ts # Публичные напоминания (20:00 UTC)
 │   └── AllInfoFlow.ts       # Отправка детального отчета админу
 ├── helpers/                 # Вспомогательные модули
 │   ├── UserProcessor.ts     # Обработка логики пользователей
 │   ├── ReportGenerator.ts   # Генерация отчетов и сообщений
+│   ├── AdminReporter.ts     # Централизованная отправка отчетов админу
 │   └── ChatManager.ts       # Работа с чатом (удаление, отправка)
 ├── index.ts                 # Главный файл с экспортами
 └── README.md               # Этот файл
@@ -32,6 +34,19 @@ cronHandler/
 5. Сброс флагов post_today
 6. Анализ опасных случаев
 7. Отправка отчета владельцу
+
+### WeeklyCronFlow (weeklyCron)
+**Время:** Раз в неделю (настраивается в cron)  
+**Логика:** Упрощенная версия daily проверки
+
+Основные задачи:
+1. Получение пользователей с pace=weekly и in_chat=true
+2. Применение фильтров (пауза, public_remind)
+3. Проверка наличия постов (post_today=true)
+4. Обновление статистики (units_count, consecutive_posts_count)
+5. Сброс страйков при наличии поста
+6. Сброс флагов post_today для weekly пользователей
+7. Отправка отчета админу
 
 ### PublicReminderFlow (publicDeadlineReminder)
 **Время:** 20:00 UTC каждый день  
@@ -60,11 +75,18 @@ cronHandler/
 - Анализ опасных случаев
 
 ### ReportGenerator
-Класс для генерации отчетов и сообщений:
-- Отправка ежедневных отчетов
+Класс для генерации отчетов и публичных сообщений:
 - Отправка публичных напоминаний
 - Вычисление времени
 - Форматирование статистики
+- Логирование в консоль
+
+### AdminReporter
+Централизованный класс для отправки отчетов админу:
+- Отправка ежедневных отчетов (daily/allinfo)
+- Отправка еженедельных отчетов
+- Отправка отчетов об ошибках
+- Улучшенное форматирование с дополнительной статистикой
 
 ### ChatManager
 Класс для работы с Telegram чатом:
@@ -77,16 +99,19 @@ cronHandler/
 Основные функции экспортируются из `index.ts`:
 
 ```typescript
-import { dailyCron, publicDeadlineReminder, allInfo } from "./cronHandler/index.ts";
+import { dailyCron, weeklyCron, publicDeadlineReminder, allInfo } from "./cronHandler/index.ts";
 
 // Ежедневный крон
 const response1 = await dailyCron();
 
+// Еженедельный крон
+const response2 = await weeklyCron();
+
 // Публичное напоминание
-const response2 = await publicDeadlineReminder();
+const response3 = await publicDeadlineReminder();
 
 // Детальный отчет
-const response3 = await allInfo();
+const response4 = await allInfo();
 ```
 
 ## Преимущества новой структуры
@@ -100,8 +125,8 @@ const response3 = await allInfo();
 ## Миграция
 
 Старый файл `cronHandler.ts` (786 строк) был разделен на:
-- `flows/` - 3 файла (~100-150 строк каждый)
-- `helpers/` - 3 файла (~100-200 строк каждый)
-- `index.ts` - 25 строк
+- `flows/` - 4 файла (~100-150 строк каждый)
+- `helpers/` - 4 файла (~100-200 строк каждый)
+- `index.ts` - 40 строк
 
 Общий объем кода остался примерно тот же, но организация стала намного лучше. 

@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendDirectMessage, findUserByTelegramId, registerUser, sendStatusMessageWithButtons } from "./userHandler.ts";
-import { MSG_START, MSG_GET_CHAT_ID, MSG_WELCOME_RETURNING, MSG_RESET_SUCCESS, OWNER_TELEGRAM_ID, MSG_CHAT_MEMBER_STATUS } from "./constants.ts";
+import { MSG_START, MSG_GET_CHAT_ID, MSG_WELCOME_RETURNING, MSG_RESET_SUCCESS, OWNER_TELEGRAM_ID, MSG_CHAT_MEMBER_STATUS, MSG_CONTINUE_SETUP_HINT, MSG_ACTIVE_USER_STATUS_HINT } from "./constants.ts";
 import { dailyCron, publicDeadlineReminder, allInfo } from "./cronHandler/index.ts";
 import { handleStartCommand } from "./startCommand/index.ts";
 import { handlePromoCode } from "./startCommand/states/index.ts";
@@ -8,6 +8,8 @@ import { syncSubscriptionsCommand } from "./tributeApiHandler.ts";
 import { handleChangeModeCommand as handleChangeModeCommandInternal, handleChangeModeCallback } from "./changeModeHandler.ts";
 import { handleChangePaceCommand as handleChangePaceCommandInternal, handleChangePaceCallback } from "./changePaceHandler.ts";
 import { handlePauseCommand, handleUnpauseCommand, handlePauseDaysInput } from "./pauseHandler.ts";
+import { handleReminderCommand as handleReminderCommandInternal } from "./reminderHandler.ts";
+import { BotMenuManager } from "./utils/botMenuManager.ts";
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
@@ -29,6 +31,17 @@ const userStates = new Map<number, string>();
  */
 export async function handleStartCommandWrapper(message: any): Promise<void> {
   await handleStartCommand(message);
+  // Обновляем меню после start команды
+  await BotMenuManager.updateUserMenu(message.from.id);
+}
+
+/**
+ * Обработчик автозапуска команды /start от текстового сообщения
+ */
+export async function handleAutoStartCommandWrapper(message: any): Promise<void> {
+  await handleStartCommand(message, true); // autoTriggered = true
+  // Обновляем меню после start команды
+  await BotMenuManager.updateUserMenu(message.from.id);
 }
 
 /**
@@ -38,10 +51,7 @@ export async function handleTextMessage(message: any): Promise<void> {
   const telegramId = message.from.id;
   const text = message.text?.trim();
   
-  console.log(`handleTextMessage: telegramId=${telegramId}, text="${text}"`);
-  
   if (!text) {
-    console.log("handleTextMessage: пустой текст, выход");
     return;
   }
   
@@ -52,23 +62,12 @@ export async function handleTextMessage(message: any): Promise<void> {
   // Fallback на Map, если поле user_state не существует в БД
   if (state === undefined && user) {
     state = userStates.get(telegramId);
-    console.log(`handleTextMessage: используем fallback Map, состояние = "${state}"`);
   }
   
-  console.log(`handleTextMessage: пользователь найден:`, user ? "да" : "нет");
-  console.log(`handleTextMessage: итоговое состояние = "${state}"`);
-  
   if (state === "waiting_promo") {
-    console.log(`handleTextMessage: обрабатываем промокод "${text}"`);
     await handlePromoCode(telegramId, text);
-    // Состояние очищается внутри handlePromoCode
-    console.log(`handleTextMessage: промокод обработан`);
   } else if (state === "waiting_pause_days") {
-    console.log(`handleTextMessage: обрабатываем количество дней паузы "${text}"`);
     await handlePauseDaysInput(message);
-    console.log(`handleTextMessage: дни паузы обработаны`);
-  } else {
-    console.log(`handleTextMessage: состояние не требует обработки, игнорируем сообщение`);
   }
 }
 
@@ -76,8 +75,6 @@ export async function handleTextMessage(message: any): Promise<void> {
  * Устанавливает состояние ожидания промокода в БД (с fallback на Map)
  */
 export async function setWaitingPromoState(telegramId: number): Promise<void> {
-  console.log(`setWaitingPromoState: установка состояния "waiting_promo" для пользователя ${telegramId}`);
-  
   // Пробуем установить в БД
   const { error } = await supabase
     .from("users")
@@ -91,9 +88,6 @@ export async function setWaitingPromoState(telegramId: number): Promise<void> {
     console.error(`setWaitingPromoState: ошибка обновления БД (используем Map fallback):`, error);
     // Fallback на Map
     userStates.set(telegramId, "waiting_promo");
-    console.log(`setWaitingPromoState: состояние установлено в Map для пользователя ${telegramId}`);
-  } else {
-    console.log(`setWaitingPromoState: состояние "waiting_promo" успешно установлено в БД для пользователя ${telegramId}`);
   }
 }
 
@@ -101,8 +95,6 @@ export async function setWaitingPromoState(telegramId: number): Promise<void> {
  * Очищает состояние пользователя в БД (с fallback на Map)
  */
 export async function clearUserState(telegramId: number): Promise<void> {
-  console.log(`clearUserState: очистка состояния для пользователя ${telegramId}`);
-  
   // Пробуем очистить в БД
   const { error } = await supabase
     .from("users")
@@ -114,13 +106,10 @@ export async function clearUserState(telegramId: number): Promise<void> {
     
   if (error) {
     console.error(`clearUserState: ошибка очистки в БД (используем Map fallback):`, error);
-  } else {
-    console.log(`clearUserState: состояние успешно очищено в БД для пользователя ${telegramId}`);
   }
   
   // Всегда очищаем Map (на всякий случай)
   userStates.delete(telegramId);
-  console.log(`clearUserState: состояние очищено в Map для пользователя ${telegramId}`);
 }
 
 /**
@@ -159,12 +148,8 @@ export async function handleComebackCommand(message: any): Promise<void> {
 export async function handleResetCommand(message: any): Promise<void> {
   const telegramId = message.from.id;
   
-  console.log(`handleResetCommand: сброс настроек для пользователя ${telegramId}`);
-  
   try {
     const now = new Date().toISOString();
-    
-    console.log(`handleResetCommand: начинаю сброс настроек для пользователя ${telegramId}`);
     
     // Сбрасываем поля процесса регистрации
     const { error, data } = await supabase
@@ -173,6 +158,7 @@ export async function handleResetCommand(message: any): Promise<void> {
         user_state: null, // Основное поле - состояние пользователя
         mode: null,
         pace: null,
+        promo_code: null, // Сбрасываем промокод
         updated_at: now
       })
       .eq("telegram_id", telegramId);
@@ -184,16 +170,14 @@ export async function handleResetCommand(message: any): Promise<void> {
       return;
     }
     
-    console.log(`handleResetCommand: SQL запрос выполнен успешно для пользователя ${telegramId}`);
-    
     // Очищаем состояние в Map (fallback для user_state)
     userStates.delete(telegramId);
-    console.log(`handleResetCommand: состояние очищено в Map для пользователя ${telegramId}`);
-    
-    console.log(`handleResetCommand: настройки успешно сброшены для пользователя ${telegramId}`);
     
     // Отправляем подтверждение
     await sendDirectMessage(telegramId, MSG_RESET_SUCCESS);
+    
+    // Обновляем меню после reset
+    await BotMenuManager.updateUserMenu(telegramId);
     
   } catch (error) {
     console.error("Ошибка в handleResetCommand:", error);
@@ -207,8 +191,6 @@ export async function handleResetCommand(message: any): Promise<void> {
 export async function handleStatusCommand(message: any): Promise<void> {
   const telegramId = message.from.id;
   
-  console.log(`handleStatusCommand: запрос статуса для пользователя ${telegramId}`);
-  
   try {
     // Получаем данные пользователя из БД
     const user = await findUserByTelegramId(telegramId);
@@ -218,13 +200,9 @@ export async function handleStatusCommand(message: any): Promise<void> {
       return;
     }
     
-    console.log(`handleStatusCommand: пользователь найден, формирую статус`);
-    
     // Формируем и отправляем сообщение со статусом с кнопками
     const statusMessage = MSG_CHAT_MEMBER_STATUS(user);
-    await sendStatusMessageWithButtons(telegramId, statusMessage);
-    
-    console.log(`handleStatusCommand: статус отправлен пользователю ${telegramId}`);
+    await sendStatusMessageWithButtons(telegramId, statusMessage, user);
     
   } catch (error) {
     console.error("Ошибка в handleStatusCommand:", error);
@@ -237,22 +215,16 @@ export async function handleStatusCommand(message: any): Promise<void> {
  */
 export async function handleOwnerCommands(message: any): Promise<void> {
   const text = message.text || "";
-  console.log(`🔧 handleOwnerCommands called with text: "${text}"`);
+  console.log(`🔧 Owner command: ${text}`);
   
   if (text === "/daily") {
-    const res = await dailyCron();
-    let report = "Команда /daily выполнена:\n";
     try {
-      const data = await res.json();
-      if (data.stats) {
-        report += `✅ Функция выполнена успешно\nПодробный отчет отправлен отдельным сообщением.`;
-      } else {
-        report += `Статус: ${data.message || 'Неизвестно'}`;
-      }
-    } catch {
-      report += `❌ Ошибка выполнения. Код: ${res.status}`;
+      await dailyCron();
+      // Основной отчет отправляется из AdminReporter.sendDailyCronReport()
+      // Дополнительное уведомление не требуется
+    } catch (error) {
+      await sendDirectMessage(message.from.id, `❌ Ошибка выполнения /daily: ${error.message}`);
     }
-    await sendDirectMessage(message.from.id, report);
   } else if (text === "/remind") {
     const res = await publicDeadlineReminder();
     let report = "Команда /remind выполнена:\n";
@@ -274,19 +246,13 @@ export async function handleOwnerCommands(message: any): Promise<void> {
     }
     await sendDirectMessage(message.from.id, report);
   } else if (text === "/allinfo") {
-    const res = await allInfo();
-    let report = "Команда /allinfo выполнена:\n";
     try {
-      const data = await res.json();
-      if (data.stats) {
-        report += `✅ Детальный отчет отправлен`;
-      } else {
-        report += `Статус: ${data.message || 'Неизвестно'}`;
-      }
-    } catch {
-      report += `❌ Ошибка выполнения. Код: ${res.status}`;
+      await allInfo();
+      // Основной отчет отправляется из AdminReporter.sendDailyCronReport()
+      // Дополнительное уведомление не требуется
+    } catch (error) {
+      await sendDirectMessage(message.from.id, `❌ Ошибка выполнения /allinfo: ${error.message}`);
     }
-    await sendDirectMessage(message.from.id, report);
   } else if (text === "/tribute_test") {
     await handleTributeTestCommand(message.from.id);
   } else if (text === "/sync_subscriptions") {
@@ -301,6 +267,8 @@ export async function handleOwnerCommands(message: any): Promise<void> {
     await handleTestSlotsCommand(message.from.id);
   } else if (text === "/close_slots") {
     await handleCloseSlotsCommand(message.from.id);
+  } else if (text === "/force_update_commands") {
+    await handleForceUpdateCommandsCommand(message.from.id);
   }
 }
 
@@ -703,6 +671,20 @@ async function handleCloseSlotsCommand(telegramId: number): Promise<void> {
  * Экспорт функции для обработки команды /change_mode
  */
 export async function handleChangeModeCommand(message: any): Promise<void> {
+  const telegramId = message.from.id;
+  
+  // Проверяем доступность команды
+  const user = await findUserByTelegramId(telegramId);
+  if (!user) {
+    await sendDirectMessage(telegramId, "❌ Пользователь не найден. Используй /start для регистрации.");
+    return;
+  }
+  
+  if (!user.in_chat || (!user.subscription_active && (!user.subscription_days_left || user.subscription_days_left <= 0))) {
+    await sendDirectMessage(telegramId, "❌ Команда доступна только активным участникам.\n\nЧтобы начать участие, используй команду /start");
+    return;
+  }
+  
   await handleChangeModeCommandInternal(message);
 }
 
@@ -710,5 +692,223 @@ export async function handleChangeModeCommand(message: any): Promise<void> {
  * Экспорт функции для обработки команды /change_pace
  */
 export async function handleChangePaceCommand(message: any): Promise<void> {
+  const telegramId = message.from.id;
+  
+  // Проверяем доступность команды
+  const user = await findUserByTelegramId(telegramId);
+  if (!user) {
+    await sendDirectMessage(telegramId, "❌ Пользователь не найден. Используй /start для регистрации.");
+    return;
+  }
+  
+  if (!user.in_chat || (!user.subscription_active && (!user.subscription_days_left || user.subscription_days_left <= 0))) {
+    await sendDirectMessage(telegramId, "❌ Команда доступна только активным участникам.\n\nЧтобы начать участие, используй команду /start");
+    return;
+  }
+  
   await handleChangePaceCommandInternal(message);
+}
+
+/**
+ * Обрабатывает команду /help - показывает справку
+ */
+export async function handleHelpCommand(message: any): Promise<void> {
+  const telegramId = message.from.id;
+  
+  const helpText = `
+📖 **Справка по боту YAD Everyday**
+
+**Основные команды:**
+• /start - Начать участие в практике
+• /status - Показать мой статус и настройки
+• /help - Эта справка
+
+**Для активных участников:**
+• /change_mode - Изменить режим (Тексты/Картинки)
+• /change_pace - Изменить ритм (Каждый день/Раз в неделю)
+• /pause - Взять каникулы на несколько дней
+• /unpause - Досрочно выйти с каникул
+• /reminder - Управление публичными напоминаниями
+
+**Участие в практике:**
+Отправляй свои работы в групповой чат с тегом #daily
+
+**Управление подпиской:**
+Управляй подпиской через @tribute
+
+**Поддержка:**
+По всем вопросам пиши @rrrtem
+`;
+
+  await sendDirectMessage(telegramId, helpText);
+}
+
+/**
+ * Обрабатывает команду /reminder - управление напоминаниями
+ */
+export async function handleReminderCommand(message: any): Promise<void> {
+  await handleReminderCommandInternal(message);
+}
+
+/**
+ * Обрабатывает команду /tribute - переход к боту Tribute для управления подпиской
+ */
+export async function handleTributeCommand(message: any): Promise<void> {
+  const telegramId = message.from.id;
+  
+  try {
+    // Находим пользователя
+    const user = await findUserByTelegramId(telegramId);
+    if (!user) {
+      await sendDirectMessage(telegramId, "❌ Пользователь не найден. Используй /start для регистрации.");
+      return;
+    }
+    
+    // Проверяем, активен ли пользователь (участник с подпиской)
+    if (!user.in_chat || (!user.subscription_active && (!user.subscription_days_left || user.subscription_days_left <= 0))) {
+      await sendDirectMessage(telegramId, "❌ Команда доступна только активным участникам с подпиской.\n\nЧтобы начать участие, используй команду /start");
+      return;
+    }
+    
+    const tributeMessage = `
+Управление подпиской → @tribute
+
+• Изменить способ оплаты
+• Отменить подписку
+• Посмотреть историю платежей
+• Обновить данные
+`;
+
+    await sendDirectMessage(telegramId, tributeMessage);
+    
+  } catch (error) {
+    console.error("Ошибка в handleTributeCommand:", error);
+    await sendDirectMessage(telegramId, "Произошла ошибка. Попробуй еще раз.");
+  }
+}
+
+/**
+ * Обрабатывает команду /update_menu - принудительно обновляет меню
+ */
+export async function handleUpdateMenuCommand(message: any): Promise<void> {
+  const telegramId = message.from.id;
+  
+  try {
+    console.log(`Принудительное обновление команд для всех пользователей...`);
+    
+    // Сначала очищаем все команды
+    await BotMenuManager.clearAllCommands();
+    
+    // Ждем немного 
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Устанавливаем новые команды
+    await BotMenuManager.setDefaultCommands();
+    
+    await sendDirectMessage(telegramId, "✅ Команды принудительно обновлены!\n\nЕсли меню не обновилось:\n1. Закрой и открой чат с ботом\n2. Перезапусти Telegram\n3. Подожди до 24 часов (кэш Telegram)");
+  } catch (error) {
+    console.error("Ошибка в handleUpdateMenuCommand:", error);
+    await sendDirectMessage(telegramId, "❌ Ошибка обновления меню.");
+  }
+}
+
+/**
+ * Принудительное обновление команд (для владельца)
+ */
+async function handleForceUpdateCommandsCommand(telegramId: number): Promise<void> {
+  try {
+    await sendDirectMessage(telegramId, "🔄 Принудительное обновление команд бота...");
+    
+    console.log(`OWNER COMMAND: Принудительное обновление команд бота...`);
+    
+    // Очищаем все команды
+    await BotMenuManager.clearAllCommands();
+    
+    // Ждем подольше для полной очистки кэша
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Устанавливаем новые команды
+    await BotMenuManager.setDefaultCommands();
+    
+    await sendDirectMessage(telegramId, "✅ Команды бота принудительно обновлены!");
+  } catch (error) {
+    console.error("Ошибка в handleForceUpdateCommandsCommand:", error);
+    await sendDirectMessage(telegramId, "❌ Ошибка принудительного обновления команд.");
+  }
+}
+
+/**
+ * Проверяет, находится ли пользователь в активном сценарии ввода
+ */
+export function isUserInInputState(user: any): boolean {
+  if (!user) return false;
+  
+  const inputStates = [
+    "waiting_promo",      // Ввод промокода
+    "waiting_pause_days"  // Ввод количества дней паузы
+  ];
+  
+  return inputStates.includes(user.user_state);
+}
+
+/**
+ * Проверяет, находится ли пользователь в процессе настройки (но не в активном вводе)
+ */
+export function isUserInSetupProcess(user: any): boolean {
+  if (!user || !user.user_state) return false;
+  
+  // Если в активном вводе - не считаем как процесс настройки (эти состояния обрабатываются отдельно)
+  if (isUserInInputState(user)) return false;
+  
+  const setupStates = [
+    "in_waitlist",
+    "waiting_mode",
+    "payment_link_sent"
+  ];
+  
+  return setupStates.includes(user.user_state);
+}
+
+/**
+ * Проверяет, является ли пользователь активным участником
+ */
+export function isActiveParticipant(user: any): boolean {
+  if (!user) return false;
+  
+  return user.in_chat === true && 
+         (user.subscription_active || (user.subscription_days_left && user.subscription_days_left > 0));
+}
+
+/**
+ * Умная обработка текстовых сообщений в зависимости от состояния пользователя
+ */
+export async function handleSmartTextMessage(message: any): Promise<void> {
+  const telegramId = message.from.id;
+  const text = message.text?.trim() || "";
+  
+  // Получаем пользователя
+  const user = await findUserByTelegramId(telegramId);
+  
+  if (!user) {
+    // Новый пользователь - автозапуск /start
+    console.log(`🆕 Новый пользователь ${telegramId} - автозапуск /start`);
+    await handleAutoStartCommandWrapper(message);
+    return;
+  }
+  
+  // Пользователь найден - определяем логику
+  const isInput = isUserInInputState(user);
+  const isSetup = isUserInSetupProcess(user);
+  const isActive = isActiveParticipant(user);
+  
+  if (isInput) {
+    await handleTextMessage(message);
+  } else if (isSetup) {
+    await sendDirectMessage(telegramId, MSG_CONTINUE_SETUP_HINT);
+  } else if (isActive) {
+    await sendDirectMessage(telegramId, MSG_ACTIVE_USER_STATUS_HINT);
+    await handleStatusCommand(message);
+  } else {
+    await handleStatusCommand(message);
+  }
 }

@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { UserProcessor } from "../helpers/UserProcessor.ts";
 import { ReportGenerator } from "../helpers/ReportGenerator.ts";
+import { AdminReporter } from "../helpers/AdminReporter.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -29,19 +30,16 @@ export class DailyCronFlow {
     const now = new Date();
     const startTime = Date.now();
     
-    console.log(`\n=== DAILY CRON STARTED ===`);
-    console.log(`🕐 Время запуска: ${now.toISOString()}`);
-    console.log(`🌐 UTC: ${now.getUTCHours()}:${now.getUTCMinutes()}:${now.getUTCSeconds()}`);
-    console.log(`📅 Дата: ${now.toDateString()}`);
+    console.log(`🤖 Daily cron started at ${now.toISOString()}`);
     
     try {
       // Получаем всех пользователей
-      console.log(`📊 Получаем данные пользователей из БД...`);
+      // console.log(`📊 Получаем данные пользователей из БД...`);
       const users = await this.userProcessor.getAllUsers();
-      console.log(`✅ Загружено ${users.length} записей пользователей из БД`);
+      console.log(`📊 Loaded ${users.length} users from DB`);
       
       // Предварительная статистика
-      ReportGenerator.logPreStats(users, now);
+      // ReportGenerator.logPreStats(users, now);
       
       // Создаем статистику
       const stats = this.userProcessor.createInitialStats();
@@ -65,13 +63,14 @@ export class DailyCronFlow {
       this.userProcessor.analyzeDangerousCases(users, now, stats);
 
       // 7. Отправка отчета владельцу
-      await ReportGenerator.sendDailyCronReport(stats);
+      await AdminReporter.sendDailyCronReport(stats, 'daily', users);
 
       // Финальная статистика
       const endTime = Date.now();
       const executionTime = endTime - startTime;
       
-      ReportGenerator.logFinalStats(stats, executionTime, "daily cron");
+      // ReportGenerator.logFinalStats(stats, executionTime, "daily cron");
+      console.log(`✅ Daily cron completed in ${executionTime}ms`);
 
       return new Response(JSON.stringify({
         message: "dailyCron завершён",

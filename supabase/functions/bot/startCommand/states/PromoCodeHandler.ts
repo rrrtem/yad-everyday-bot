@@ -7,8 +7,13 @@ import {
   PROMO_TYPES,
   FREE_PROMO_DAYS,
   MSG_FREE_PROMO_SUCCESS,
-  CHALLENGE_JOIN_LINK
+  CHALLENGE_JOIN_LINK,
+  CALLBACK_RESET,
+  BUTTON_TEXT_RESET
 } from "../../constants.ts";
+
+const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
+const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 /**
  * Обработчик промокодов
@@ -20,34 +25,30 @@ export class PromoCodeHandler {
    * Проверка промокодов происходит без учета регистра - можно вводить в любом регистре
    */
   static async handlePromoCode(telegramId: number, promoCode: string): Promise<void> {
-    try {
-      console.log(`PromoCodeHandler: пользователь ${telegramId} ввел промокод "${promoCode}"`);
-      console.log(`PromoCodeHandler: валидные промокоды:`, VALID_PROMO_CODES);
+    // console.log(`PromoCodeHandler: пользователь ${telegramId} ввел промокод "${promoCode}"`);
+    // console.log(`PromoCodeHandler: валидные промокоды:`, VALID_PROMO_CODES);
+    
+    if (VALID_PROMO_CODES.includes(promoCode)) {
+      // console.log(`PromoCodeHandler: промокод "${promoCode}" валидный`);
       
-      // Проверяем промокод без учета регистра - преобразуем в верхний регистр
-      if (VALID_PROMO_CODES.includes(promoCode.toUpperCase())) {
-        console.log(`PromoCodeHandler: промокод "${promoCode}" валидный`);
-        
-        // Определяем тип промокода и обрабатываем соответственно
-        const promoType = promoCode.toUpperCase();
-        
-        if (promoType === PROMO_TYPES.CLUB_DISCOUNT) {
-          await this.handleClubDiscountPromo(telegramId, promoCode);
-        } else if (promoType === PROMO_TYPES.FREE_DAYS) {
-          await this.handleFreeDaysPromo(telegramId, promoCode);
-        } else {
-          console.error(`PromoCodeHandler: неизвестный тип промокода "${promoType}"`);
-          await sendDirectMessage(telegramId, "Произошла ошибка обработки промокода.");
-        }
-        
+      if (promoCode === PROMO_TYPES.CLUB_DISCOUNT) {
+        await this.handleClubDiscountPromo(telegramId, promoCode);
+      } else if (promoCode === PROMO_TYPES.FREE_DAYS) {
+        await this.handleFreeDaysPromo(telegramId, promoCode);
       } else {
-        console.log(`PromoCodeHandler: промокод "${promoCode}" невалидный`);
-        // Промокод невалидный - НЕ очищаем состояние, пользователь может попробовать еще раз
+        // Неизвестный тип промокода (shouldn't happen if constants are correct)
         await sendDirectMessage(telegramId, MSG_PROMO_ERR);
-        // Не вызываем sendPromoSelection повторно, пользователь уже в состоянии ожидания
-        console.log(`PromoCodeHandler: отправлено сообщение об ошибке, состояние ожидания сохранено`);
+        await this.sendPromoErrorWithResetButton(telegramId);
       }
-      
+    } else {
+      // console.log(`PromoCodeHandler: промокод "${promoCode}" невалидный`);
+      await this.sendPromoErrorWithResetButton(telegramId);
+      await setWaitingPromoState(telegramId);
+      // console.log(`PromoCodeHandler: отправлено сообщение об ошибке, состояние ожидания сохранено`);
+    }
+
+    try {
+      await clearUserState(telegramId);
     } catch (error) {
       console.error("Ошибка в PromoCodeHandler.handlePromoCode:", error);
       await sendDirectMessage(telegramId, "Произошла ошибка. Попробуй еще раз.");
@@ -126,7 +127,7 @@ export class PromoCodeHandler {
       }
         
       await PaymentHandler.sendClubPaymentLink(telegramId);
-      console.log(`PromoCodeHandler: отправлена клубная ссылка для пользователя ${telegramId}`);
+      // console.log(`PromoCodeHandler: отправлена клубная ссылка для пользователя ${telegramId}`);
       
     } catch (error) {
       console.error("Ошибка в PromoCodeHandler.handleClubDiscountPromo:", error);
@@ -165,7 +166,7 @@ export class PromoCodeHandler {
       
       // Отправляем специальное сообщение для промокода FREE10 с кнопкой входа в чат
       await this.sendFreePromoSuccessMessage(telegramId, FREE_PROMO_DAYS);
-      console.log(`PromoCodeHandler: начислено ${FREE_PROMO_DAYS} бесплатных дней и отправлена прямая ссылка для пользователя ${telegramId}`);
+      // console.log(`PromoCodeHandler: начислено ${FREE_PROMO_DAYS} бесплатных дней и отправлена прямая ссылка для пользователя ${telegramId}`);
       
     } catch (error) {
       console.error("Ошибка в PromoCodeHandler.handleFreeDaysPromo:", error);
@@ -201,6 +202,34 @@ export class PromoCodeHandler {
       console.error("Ошибка в PromoCodeHandler.sendFreePromoSuccessMessage:", error);
       // Fallback - отправляем обычное сообщение
       await sendDirectMessage(telegramId, MSG_FREE_PROMO_SUCCESS(daysLeft));
+    }
+  }
+
+  /**
+   * Отправляет сообщение об ошибке промокода с кнопкой "начать заново"
+   */
+  private static async sendPromoErrorWithResetButton(telegramId: number): Promise<void> {
+    try {
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: BUTTON_TEXT_RESET, callback_data: CALLBACK_RESET }]
+        ]
+      };
+      
+      await fetch(`${TELEGRAM_API}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: telegramId,
+          text: MSG_PROMO_ERR,
+          parse_mode: "HTML",
+          reply_markup: keyboard
+        })
+      });
+    } catch (error) {
+      console.error("Ошибка в PromoCodeHandler.sendPromoErrorWithResetButton:", error);
+      // Fallback - отправляем обычное сообщение
+      await sendDirectMessage(telegramId, MSG_PROMO_ERR);
     }
   }
 } 

@@ -5,7 +5,8 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import { updateUserFromChatMember } from "./userHandler.ts";
 import { handleDailyPost } from "./dailyPostHandler.ts";
-import { handleStartCommandWrapper, handleGetCommand, handleComebackCommand, handleResetCommand, handleStatusCommand, handleOwnerCommands, handleTextMessage, handleChangeModeCommand } from "./commandHandler.ts";
+import { handleStartCommandWrapper, handleAutoStartCommandWrapper, handleGetCommand, handleComebackCommand, handleResetCommand, handleStatusCommand, handleOwnerCommands, handleTextMessage, handleChangeModeCommand, handleHelpCommand, handleReminderCommand, handleUpdateMenuCommand, handleSmartTextMessage, handleTributeCommand } from "./commandHandler.ts";
+import { handleToggleReminderCallback } from "./reminderHandler.ts";
 import { handlePauseCommand, handleUnpauseCommand } from "./pauseHandler.ts";
 import { handleChangeModeCallback } from "./changeModeHandler.ts";
 import { handleChangePaceCommand, handleChangePaceCallback } from "./changePaceHandler.ts";
@@ -14,7 +15,17 @@ import { dailyCron, publicDeadlineReminder } from "./cronHandler/index.ts";
 import { handleNewChatMember } from "./newChatMemberHandler.ts";
 import { handleLeftChatMember } from "./leftChatMemberHandler.ts";
 import { handleTributeWebhook, syncSubscriptionsCommand } from "./tributeApiHandler.ts";
+import { 
+  handlePauseCallbackQuery, 
+  handleUnpauseCallbackQuery, 
+  handleRemindersCallbackQuery, 
+  handleChooseModeCallbackQuery, 
+  handleChoosePaceCallbackQuery,
+  handleChangeModeCallbackQuery,
+  handleChangePaceCallbackQuery
+} from "./statusCallbackHandlers.ts";
 import { OWNER_TELEGRAM_ID } from "./constants.ts";
+import { BotMenuManager } from "./utils/botMenuManager.ts";
 
 // Переменные окружения и API Telegram
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
@@ -116,6 +127,11 @@ async function getWebhookInfo(): Promise<Response> {
 }
 
 console.log("Bot function started.");
+
+// Инициализируем глобальные команды при старте
+BotMenuManager.setDefaultCommands().catch(err => {
+  console.error("Failed to set default commands:", err);
+});
 
 Deno.serve(async (req) => {
   const url = new URL(req.url);
@@ -228,25 +244,51 @@ Deno.serve(async (req) => {
         await handleGetCommand(message);
       } else if (text === "/comeback") {
         await handleComebackCommand(message);
-      } else if (text === "/reset") {
-        await handleResetCommand(message);
-      } else if (text === "/status") {
-        await handleStatusCommand(message);
-      } else if (text === "/change_mode") {
+              } else if (text === "/reset") {
+          await handleResetCommand(message);
+        } else if (text === "/status") {
+          await handleStatusCommand(message);
+        } else if (text === "/help") {
+          await handleHelpCommand(message);
+                } else if (text === "/reminder") {
+          await handleReminderCommand(message);
+        } else if (text === "/tribute") {
+          await handleTributeCommand(message);
+        } else if (text === "/update_menu") {
+          await handleUpdateMenuCommand(message);
+        } else if (text === "/change_mode") {
         await handleChangeModeCommand(message);
-      } else if (text === "/change_pace") {
-        await handleChangePaceCommand(message);
-      } else if (text === "/pause") {
-        await handlePauseCommand(message);
-      } else if (text === "/unpause") {
-        await handleUnpauseCommand(message);
+              } else if (text === "/change_pace") {
+          await handleChangePaceCommand(message);
+              } else if (text === "/pause") {
+          // Проверяем доступность команды перед выполнением
+          const { findUserByTelegramId, sendDirectMessage } = await import("./userHandler.ts");
+          const user = await findUserByTelegramId(message.from.id);
+          if (!user) {
+            await sendDirectMessage(message.from.id, "❌ Пользователь не найден. Используй /start для регистрации.");
+          } else if (!user.in_chat || (!user.subscription_active && (!user.subscription_days_left || user.subscription_days_left <= 0))) {
+            await sendDirectMessage(message.from.id, "❌ Команда доступна только активным участникам.\n\nЧтобы начать участие, используй команду /start");
+          } else {
+            await handlePauseCommand(message);
+          }
+        } else if (text === "/unpause") {
+          // Проверяем доступность команды перед выполнением
+          const { findUserByTelegramId, sendDirectMessage } = await import("./userHandler.ts");
+          const user = await findUserByTelegramId(message.from.id);
+          if (!user) {
+            await sendDirectMessage(message.from.id, "❌ Пользователь не найден. Используй /start для регистрации.");
+          } else if (!user.in_chat || (!user.subscription_active && (!user.subscription_days_left || user.subscription_days_left <= 0))) {
+            await sendDirectMessage(message.from.id, "❌ Команда доступна только активным участникам.\n\nЧтобы начать участие, используй команду /start");
+          } else {
+            await handleUnpauseCommand(message);
+          }
       } else if (/\B#daily\b/i.test(text)) {
         await handleDailyPost(message);
-      } else if (chatType === "private" && message.from.id === OWNER_TELEGRAM_ID && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions", "/slots", "/test_slots", "/close_slots"].includes(text) || text.startsWith("/test_webhook ") || text.startsWith("/open"))) {
+      } else if (chatType === "private" && message.from.id === OWNER_TELEGRAM_ID && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions", "/slots", "/test_slots", "/close_slots", "/force_update_commands"].includes(text) || text.startsWith("/test_webhook ") || text.startsWith("/open"))) {
         await handleOwnerCommands(message);
-      } else if (chatType === "private" && text && !text.startsWith("/")) {
-        // Обрабатываем текстовые сообщения в личке (промокоды)
-        await handleTextMessage(message);
+            } else if (chatType === "private" && text && !text.startsWith("/")) {
+        // Умная обработка текстовых сообщений в зависимости от состояния пользователя
+        await handleSmartTextMessage(message);
       }
     }
     // Обработка callback_query (нажатия на inline кнопки)
@@ -258,6 +300,24 @@ Deno.serve(async (req) => {
         await handleChangeModeCallback(update.callback_query);
       } else if (update.callback_query.data && update.callback_query.data.startsWith("change_pace:")) {
         await handleChangePaceCallback(update.callback_query);
+      } else if (update.callback_query.data === "change_mode") {
+        await handleChangeModeCallbackQuery(update.callback_query);
+      } else if (update.callback_query.data === "change_pace") {
+        await handleChangePaceCallbackQuery(update.callback_query);
+      } else if (update.callback_query.data === "toggle_public_reminder") {
+        await handleToggleReminderCallback(update.callback_query);
+      } else if (update.callback_query.data === "pause") {
+        await handlePauseCallbackQuery(update.callback_query);
+      } else if (update.callback_query.data === "unpause") {
+        await handleUnpauseCallbackQuery(update.callback_query);
+      } else if (update.callback_query.data === "disable_reminders") {
+        await handleRemindersCallbackQuery(update.callback_query, false);
+      } else if (update.callback_query.data === "enable_reminders") {
+        await handleRemindersCallbackQuery(update.callback_query, true);
+      } else if (update.callback_query.data === "choose_mode") {
+        await handleChooseModeCallbackQuery(update.callback_query);
+      } else if (update.callback_query.data === "choose_pace") {
+        await handleChoosePaceCallbackQuery(update.callback_query);
       } else {
         // Обрабатываем остальные callback query через стандартный обработчик
         await handleStartCallbackQuery(update.callback_query);

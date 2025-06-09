@@ -84,7 +84,7 @@ export class WaitlistFlow {
     // Используем SlotManager для проверки доступных мест
     const hasSlots = await SlotManager.hasAvailableSlots();
     const shouldWaitlist = !hasSlots;
-    console.log(`WaitlistFlow.shouldAddToWaitlist: hasSlots=${hasSlots}, shouldWaitlist=${shouldWaitlist}`);
+    // console.log(`WaitlistFlow.shouldAddToWaitlist: hasSlots=${hasSlots}, shouldWaitlist=${shouldWaitlist}`);
     return shouldWaitlist;
   }
 } 

@@ -1,6 +1,7 @@
 import { DailyCronFlow } from "./flows/DailyCronFlow.ts";
 import { PublicReminderFlow } from "./flows/PublicReminderFlow.ts";
 import { AllInfoFlow } from "./flows/AllInfoFlow.ts";
+import { WeeklyCronFlow } from "./flows/WeeklyCronFlow.ts";
 
 /**
  * Ежедневная проверка (dailyCron) - реализует логику Б2 из logic.md
@@ -26,5 +27,15 @@ export async function publicDeadlineReminder(): Promise<Response> {
  */
 export async function allInfo(): Promise<Response> {
   const flow = new AllInfoFlow();
+  return await flow.execute();
+}
+
+/**
+ * Еженедельная проверка (weeklyCron) для пользователей с pace=weekly
+ * Упрощенная версия daily проверки - только подсчет постов
+ * Запускается раз в неделю
+ */
+export async function weeklyCron(): Promise<Response> {
+  const flow = new WeeklyCronFlow();
   return await flow.execute();
 } 

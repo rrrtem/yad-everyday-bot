@@ -5,6 +5,7 @@ import {
   MSG_CHANGE_MODE_SUCCESS,
   MSG_CHANGE_MODE_SAME,
   MSG_CHANGE_MODE_NOT_ACTIVE,
+  MSG_CHANGE_MODE_ALL_SET,
   AVAILABLE_MODES,
   CALLBACK_CHANGE_MODE_TEXT,
   CALLBACK_CHANGE_MODE_IMAGE,
@@ -25,16 +26,31 @@ const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /**
  * Отправляет сообщение с кнопками выбора режима
+ * Показывает только доступные для переключения режимы (исключая текущий)
  */
-async function sendModeSelectionMessage(telegramId: number): Promise<void> {
+async function sendModeSelectionMessage(telegramId: number, currentMode: string): Promise<void> {
   try {
+    // Создаем массив доступных режимов, исключая текущий
+    const availableButtons = [];
+    
+    // Добавляем кнопку "Тексты" только если текущий режим не "text"
+    if (currentMode !== AVAILABLE_MODES.TEXT) {
+      availableButtons.push([{ text: "📝 Тексты", callback_data: CALLBACK_CHANGE_MODE_TEXT }]);
+    }
+    
+    // Добавляем кнопку "Картинки" только если текущий режим не "image"
+    if (currentMode !== AVAILABLE_MODES.IMAGE) {
+      availableButtons.push([{ text: "🎨 Картинки", callback_data: CALLBACK_CHANGE_MODE_IMAGE }]);
+    }
+
+    // Если нет доступных для переключения режимов, отправляем сообщение без кнопок
+    if (availableButtons.length === 0) {
+      await sendDirectMessage(telegramId, MSG_CHANGE_MODE_ALL_SET);
+      return;
+    }
+
     const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📝 Тексты", callback_data: CALLBACK_CHANGE_MODE_TEXT },
-          { text: "🎨 Картинки", callback_data: CALLBACK_CHANGE_MODE_IMAGE }
-        ]
-      ]
+      inline_keyboard: availableButtons
     };
 
     const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
@@ -67,7 +83,7 @@ async function sendModeSelectionMessage(telegramId: number): Promise<void> {
 function getThreadInfo(mode: string): string {
   const threadId = mode === AVAILABLE_MODES.TEXT ? PUBLIC_REMINDER_THREAD_ID_TEXT : PUBLIC_REMINDER_THREAD_ID_IMAGE;
   const threadName = mode === AVAILABLE_MODES.TEXT ? 'Тексты' : 'Картинки';
-  return `📍 Твой топик для публичных напоминаний: **${threadName}** (ID: ${threadId})`;
+  return `Теперь присылай апдейты сюда: https://t.me/c/2366470605/${threadId}`;
 }
 
 /**
@@ -75,10 +91,10 @@ function getThreadInfo(mode: string): string {
  * Показывает пользователю доступные режимы для выбора
  */
 export async function handleChangeModeCommand(message: any): Promise<void> {
-  console.log("handleChangeModeCommand called", JSON.stringify(message));
+  // console.log("handleChangeModeCommand called", JSON.stringify(message));
 
   if (!message || !message.from) {
-    console.log("handleChangeModeCommand: недостаточно данных в сообщении");
+    // console.log("handleChangeModeCommand: недостаточно данных в сообщении");
     return;
   }
 
@@ -89,7 +105,7 @@ export async function handleChangeModeCommand(message: any): Promise<void> {
     const user = await findUserByTelegramId(telegramId);
     
     if (!user) {
-      console.log(`handleChangeModeCommand: пользователь ${telegramId} не найден`);
+      // console.log(`handleChangeModeCommand: пользователь ${telegramId} не найден`);
       await sendDirectMessage(telegramId, MSG_CHANGE_MODE_NOT_ACTIVE);
       return;
     }
@@ -98,14 +114,14 @@ export async function handleChangeModeCommand(message: any): Promise<void> {
     const isActive = user.in_chat || user.subscription_active || user.subscription_days_left > 0;
     
     if (!isActive) {
-      console.log(`handleChangeModeCommand: пользователь ${telegramId} не активен`);
+      // console.log(`handleChangeModeCommand: пользователь ${telegramId} не активен`);
       await sendDirectMessage(telegramId, MSG_CHANGE_MODE_NOT_ACTIVE);
       return;
     }
 
     // Отправляем сообщение с выбором режима
-    console.log(`handleChangeModeCommand: отправляем выбор режима пользователю ${telegramId}`);
-    await sendModeSelectionMessage(telegramId);
+    // console.log(`handleChangeModeCommand: отправляем выбор режима пользователю ${telegramId}, текущий режим: ${user.mode}`);
+    await sendModeSelectionMessage(telegramId, user.mode);
 
   } catch (error) {
     console.error(`handleChangeModeCommand: ошибка для пользователя ${telegramId}:`, error);
@@ -118,10 +134,10 @@ export async function handleChangeModeCommand(message: any): Promise<void> {
  * Обновляет режим пользователя в БД и отправляет подтверждение
  */
 export async function handleChangeModeCallback(callbackQuery: any): Promise<void> {
-  console.log("handleChangeModeCallback called", JSON.stringify(callbackQuery));
+  // console.log("handleChangeModeCallback called", JSON.stringify(callbackQuery));
 
   if (!callbackQuery || !callbackQuery.from || !callbackQuery.data) {
-    console.log("handleChangeModeCallback: недостаточно данных в callback");
+    // console.log("handleChangeModeCallback: недостаточно данных в callback");
     return;
   }
 
@@ -137,7 +153,7 @@ export async function handleChangeModeCallback(callbackQuery: any): Promise<void
     } else if (callbackData === CALLBACK_CHANGE_MODE_IMAGE) {
       selectedMode = AVAILABLE_MODES.IMAGE;
     } else {
-      console.log(`handleChangeModeCallback: неизвестный callback_data: ${callbackData}`);
+      // console.log(`handleChangeModeCallback: неизвестный callback_data: ${callbackData}`);
       return;
     }
 
@@ -145,14 +161,14 @@ export async function handleChangeModeCallback(callbackQuery: any): Promise<void
     const user = await findUserByTelegramId(telegramId);
     
     if (!user) {
-      console.log(`handleChangeModeCallback: пользователь ${telegramId} не найден`);
+      // console.log(`handleChangeModeCallback: пользователь ${telegramId} не найден`);
       await sendDirectMessage(telegramId, MSG_CHANGE_MODE_NOT_ACTIVE);
       return;
     }
 
     // Проверяем, не выбран ли уже этот режим
     if (user.mode === selectedMode) {
-      console.log(`handleChangeModeCallback: пользователь ${telegramId} уже в режиме ${selectedMode}`);
+      // console.log(`handleChangeModeCallback: пользователь ${telegramId} уже в режиме ${selectedMode}`);
       await sendDirectMessage(telegramId, MSG_CHANGE_MODE_SAME(selectedMode));
       
       // Отвечаем на callback query
