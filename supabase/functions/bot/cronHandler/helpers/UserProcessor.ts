@@ -350,7 +350,7 @@ export class UserProcessor {
       if (user.strikes_count === 3 && user.in_chat) {
         stats.dangerousCases.push({
           username,
-          reason: "3 страйка - на грани исключения"
+          reason: "3 страйка - на грани постановки на паузу"
         });
       }
       

@@ -134,10 +134,31 @@ export class AdminReporter {
       report += `\n`;
     }
     
+    // Критично: пауза заканчивается завтра (будут удалены)
+    const criticalPausedUsers = users.filter(u => {
+      if (!u.pause_until || new Date(u.pause_until) <= now) {
+        return false;
+      }
+      const pauseEndTime = new Date(u.pause_until).getTime();
+      const oneDayFromNow = now.getTime() + (24 * 60 * 60 * 1000);
+      return pauseEndTime <= oneDayFromNow;
+    });
+    
+    if (criticalPausedUsers.length > 0) {
+      report += `🚨 Критично: пауза заканчивается ≤1 дня (будут удалены) — ${criticalPausedUsers.length}:\n`;
+      criticalPausedUsers.forEach(u => {
+        const username = u.username || `ID${u.telegram_id}`;
+        const pauseEndDate = new Date(u.pause_until!).toLocaleDateString('ru-RU');
+        const hoursLeft = Math.ceil((new Date(u.pause_until!).getTime() - now.getTime()) / (60 * 60 * 1000));
+        report += `   @${username} — до ${pauseEndDate} (${hoursLeft}ч)\n`;
+      });
+      report += `\n`;
+    }
+    
     // Пользователи с 3 страйками (на грани исключения)
     const dangerousUsers = users.filter(u => u.in_chat && u.strikes_count === 3);
     if (dangerousUsers.length > 0) {
-      report += `⚠️ На грани постановки на паузу — ${dangerousUsers.length}:\n`;
+      report += `⚠️ На грани постановки на паузу (${dangerousUsers.length}):\n`;
       dangerousUsers.forEach(u => {
         const username = u.username || `ID${u.telegram_id}`;
         report += `   @${username}\n`;
@@ -391,7 +412,7 @@ export class AdminReporter {
     }
     
     if (stats.riskyUsers.length > 0) {
-      report += `🚨 На грани постановки на паузу (3 страйка):\n`;
+      report += `🚨 На грани постановки на паузу:\n`;
       stats.riskyUsers.forEach((user: any) => {
         report += `• @${user.username}\n`;
       });
