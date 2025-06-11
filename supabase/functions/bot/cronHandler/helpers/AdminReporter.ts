@@ -137,7 +137,7 @@ export class AdminReporter {
     // Пользователи с 3 страйками (на грани исключения)
     const dangerousUsers = users.filter(u => u.in_chat && u.strikes_count === 3);
     if (dangerousUsers.length > 0) {
-      report += `⚠️ На грани исключения (3 страйка) — ${dangerousUsers.length}:\n`;
+      report += `⚠️ На грани постановки на паузу — ${dangerousUsers.length}:\n`;
       dangerousUsers.forEach(u => {
         const username = u.username || `ID${u.telegram_id}`;
         report += `   @${username}\n`;
@@ -386,6 +386,14 @@ export class AdminReporter {
       report += `⚠️ Новые страйки:\n`;
       stats.newStrikes.forEach((user: any) => {
         report += `• @${user.username} — ${user.strikes} страйк(а)\n`;
+      });
+      report += `\n`;
+    }
+    
+    if (stats.riskyUsers.length > 0) {
+      report += `🚨 На грани постановки на паузу (3 страйка):\n`;
+      stats.riskyUsers.forEach((user: any) => {
+        report += `• @${user.username}\n`;
       });
       report += `\n`;
     }
