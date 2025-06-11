@@ -236,6 +236,7 @@ Deno.serve(async (req) => {
       const chatType = message.chat.type;
 
       console.log(`Processing message: ${text} from chat type: ${chatType}`);
+      console.log(`User ID: ${message.from.id}, Owner ID: ${OWNER_TELEGRAM_ID}, Is Owner: ${message.from.id === OWNER_TELEGRAM_ID}`);
 
       // Команды бота
       if (text === "/start") {
@@ -284,11 +285,18 @@ Deno.serve(async (req) => {
           }
       } else if (/\B#daily\b/i.test(text)) {
         await handleDailyPost(message);
-      } else if (chatType === "private" && message.from.id === OWNER_TELEGRAM_ID && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions", "/slots", "/test_slots", "/close_slots", "/force_update_commands"].includes(text) || text.startsWith("/test_webhook ") || text.startsWith("/open"))) {
+      } else if (chatType === "private" && message.from.id === OWNER_TELEGRAM_ID && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions", "/slots", "/test_slots", "/close_slots", "/force_update_commands", "/mass_status"].includes(text) || text.startsWith("/test_webhook ") || text.startsWith("/open") || text.startsWith("/broadcast_chat ") || text.startsWith("/broadcast_nochat "))) {
+        console.log(`🔑 OWNER COMMAND DETECTED: "${text}" from user ${message.from.id} (owner: ${OWNER_TELEGRAM_ID})`);
         await handleOwnerCommands(message);
             } else if (chatType === "private" && text && !text.startsWith("/")) {
         // Умная обработка текстовых сообщений в зависимости от состояния пользователя
         await handleSmartTextMessage(message);
+      } else if (text.startsWith("/")) {
+        // Неизвестная команда
+        console.log(`❓ UNKNOWN COMMAND: "${text}" from user ${message.from.id} (chat: ${chatType})`);
+        if (message.from.id === OWNER_TELEGRAM_ID) {
+          console.log(`❗ This was from OWNER but didn't match owner commands pattern!`);
+        }
       }
     }
     // Обработка callback_query (нажатия на inline кнопки)

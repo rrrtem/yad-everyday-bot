@@ -16,9 +16,9 @@ export class SlotManager {
     const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
     
     const { data, error } = await supabase
-      .from("settings")
-      .select("value")
-      .eq("key", "available_slots")
+      .from("slot_settings")
+      .select("available_slots")
+      .eq("id", 1)
       .single();
 
     if (error || !data) {
@@ -26,9 +26,33 @@ export class SlotManager {
       return 0;
     }
 
-    const slots = parseInt(data.value, 10) || 0;
+    const slots = data.available_slots || 0;
     // console.log(`SlotManager.getAvailableSlots: Получено слотов из БД: ${slots}`);
     return slots;
+  }
+  
+  /**
+   * Получает общее количество открытых слотов
+   */
+  static async getTotalSlotsOpened(): Promise<number> {
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
+    
+    const { data, error } = await supabase
+      .from("slot_settings")
+      .select("total_slots_opened")
+      .eq("id", 1)
+      .single();
+
+    if (error || !data) {
+      console.error("Ошибка получения общего количества слотов:", error);
+      return 0;
+    }
+
+    const totalSlots = data.total_slots_opened || 0;
+    return totalSlots;
   }
   
   /**
@@ -40,12 +64,16 @@ export class SlotManager {
     const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
     
+    const now = new Date().toISOString();
+    
+    // Обновляем оба поля в одном запросе
     const { error } = await supabase
-      .from("settings")
+      .from("slot_settings")
       .upsert({
-        key: "available_slots",
-        value: slots.toString(),
-        updated_at: new Date().toISOString(),
+        id: 1,
+        available_slots: slots,
+        total_slots_opened: slots,
+        updated_at: now,
         updated_by: adminId
       });
 
@@ -63,7 +91,30 @@ export class SlotManager {
    */
   static async closeAllSlots(adminId: number): Promise<number> {
     console.log(`SlotManager: Closing all slots by admin ${adminId}`);
-    return await this.setAvailableSlots(0, adminId);
+    
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
+    
+    const now = new Date().toISOString();
+    
+    // Только обнуляем available_slots, total_slots_opened оставляем как есть
+    const { error } = await supabase
+      .from("slot_settings")
+      .update({
+        available_slots: 0,
+        updated_at: now,
+        updated_by: adminId
+      })
+      .eq("id", 1);
+
+    if (error) {
+      console.error("Ошибка закрытия слотов:", error);
+      throw error;
+    }
+
+    return 0;
   }
   
   /**
@@ -85,12 +136,12 @@ export class SlotManager {
     const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
 
     const { error } = await supabase
-      .from("settings")
+      .from("slot_settings")
       .update({
-        value: newSlots.toString(),
+        available_slots: newSlots,
         updated_at: new Date().toISOString()
       })
-      .eq("key", "available_slots");
+      .eq("id", 1);
 
     if (error) {
       console.error("Ошибка уменьшения слотов:", error);
@@ -110,6 +161,14 @@ export class SlotManager {
    */
   static async increaseAvailableSlots(): Promise<number> {
     const currentSlots = await this.getAvailableSlots();
+    const totalSlots = await this.getTotalSlotsOpened();
+    
+    // Не увеличиваем выше максимального значения
+    if (currentSlots >= totalSlots) {
+      console.log(`SlotManager: Не увеличиваем слоты - уже на максимуме (${currentSlots}/${totalSlots})`);
+      return currentSlots;
+    }
+    
     const newSlots = currentSlots + 1;
     // console.log(`SlotManager: Слот освобожден, доступно мест: ${newSlots}`);
 
@@ -119,12 +178,12 @@ export class SlotManager {
     const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
 
     const { error } = await supabase
-      .from("settings")
+      .from("slot_settings")
       .update({
-        value: newSlots.toString(),
+        available_slots: newSlots,
         updated_at: new Date().toISOString()
       })
-      .eq("key", "available_slots");
+      .eq("id", 1);
 
     if (error) {
       console.error("Ошибка увеличения слотов:", error);

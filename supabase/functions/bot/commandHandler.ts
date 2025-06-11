@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendDirectMessage, findUserByTelegramId, registerUser, sendStatusMessageWithButtons } from "./userHandler.ts";
-import { MSG_START, MSG_GET_CHAT_ID, MSG_WELCOME_RETURNING, MSG_RESET_SUCCESS, OWNER_TELEGRAM_ID, MSG_CHAT_MEMBER_STATUS, MSG_CONTINUE_SETUP_HINT, MSG_ACTIVE_USER_STATUS_HINT } from "./constants.ts";
+import { MSG_START, MSG_GET_CHAT_ID, MSG_WELCOME_RETURNING, MSG_RESET_SUCCESS, OWNER_TELEGRAM_ID, MSG_CHAT_MEMBER_STATUS, MSG_CONTINUE_SETUP_HINT, MSG_ACTIVE_USER_STATUS_HINT, MSG_BROADCAST_CHAT_USAGE, MSG_BROADCAST_NOCHAT_USAGE, MSG_BROADCAST_STARTING_CHAT, MSG_BROADCAST_STARTING_NOCHAT, MSG_MASS_STATUS_STARTING, MSG_NO_USERS_IN_CHAT, MSG_NO_USERS_OUT_CHAT, MSG_BROADCAST_COMPLETED, MSG_MASS_STATUS_COMPLETED } from "./constants.ts";
 import { dailyCron, publicDeadlineReminder, allInfo } from "./cronHandler/index.ts";
 import { handleStartCommand } from "./startCommand/index.ts";
 import { handlePromoCode } from "./startCommand/states/index.ts";
@@ -215,7 +215,8 @@ export async function handleStatusCommand(message: any): Promise<void> {
  */
 export async function handleOwnerCommands(message: any): Promise<void> {
   const text = message.text || "";
-  console.log(`🔧 Owner command: ${text}`);
+  const userId = message.from?.id;
+  console.log(`🔧 Owner command: ${text} from user ${userId} (owner: ${OWNER_TELEGRAM_ID})`);
   
   if (text === "/daily") {
     try {
@@ -269,6 +270,12 @@ export async function handleOwnerCommands(message: any): Promise<void> {
     await handleCloseSlotsCommand(message.from.id);
   } else if (text === "/force_update_commands") {
     await handleForceUpdateCommandsCommand(message.from.id);
+  } else if (text.startsWith("/broadcast_chat ")) {
+    await handleBroadcastChatCommand(message.from.id, text);
+  } else if (text.startsWith("/broadcast_nochat ")) {
+    await handleBroadcastNoChatCommand(message.from.id, text);
+  } else if (text === "/mass_status") {
+    await handleMassStatusCommand(message.from.id);
   }
 }
 
@@ -604,6 +611,14 @@ async function handleTestSlotsCommand(telegramId: number): Promise<void> {
       report += `❌ getAvailableSlots(): ${error.message}\n`;
     }
     
+    // Тест 1b: Получение общего количества слотов
+    try {
+      const totalSlots = await SlotManager.getTotalSlotsOpened();
+      report += `✅ getTotalSlotsOpened(): ${totalSlots}\n`;
+    } catch (error) {
+      report += `❌ getTotalSlotsOpened(): ${error.message}\n`;
+    }
+    
     // Тест 2: Проверка hasAvailableSlots
     try {
       const hasSlots = await SlotManager.hasAvailableSlots();
@@ -629,7 +644,28 @@ async function handleTestSlotsCommand(telegramId: number): Promise<void> {
       report += `❌ shouldAddToWaitlist(): ${error.message}\n`;
     }
     
-    report += "\n💡 Если есть ошибки, вероятно нужно выполнить SQL миграцию slots_system_migration.sql";
+    // Тест 5: Прямой запрос к БД для проверки записей
+    try {
+      const { data: slotData } = await supabase
+        .from("slot_settings")
+        .select("id, available_slots, total_slots_opened, updated_at, updated_by")
+        .eq("id", 1)
+        .single();
+      
+      report += `\n📋 Данные в БД (таблица slot_settings):\n`;
+      if (slotData) {
+        report += `• available_slots: ${slotData.available_slots}\n`;
+        report += `• total_slots_opened: ${slotData.total_slots_opened}\n`;
+        report += `• updated_at: ${slotData.updated_at}\n`;
+        report += `• updated_by: ${slotData.updated_by}\n`;
+      } else {
+        report += `❌ Нет записи с id=1 в таблице slot_settings!\n`;
+      }
+    } catch (error) {
+      report += `❌ Ошибка проверки БД: ${error.message}\n`;
+    }
+    
+    report += "\n💡 Если есть ошибки или пустые данные, выполни команду /open10 для инициализации системы слотов";
     
     await sendDirectMessage(telegramId, report);
     
@@ -834,6 +870,197 @@ async function handleForceUpdateCommandsCommand(telegramId: number): Promise<voi
   } catch (error) {
     console.error("Ошибка в handleForceUpdateCommandsCommand:", error);
     await sendDirectMessage(telegramId, "❌ Ошибка принудительного обновления команд.");
+  }
+}
+
+/**
+ * Рассылка сообщения пользователям в чате (только для владельца)
+ * Использование: /broadcast_chat Привет всем участникам!
+ */
+async function handleBroadcastChatCommand(telegramId: number, text: string): Promise<void> {
+  console.log(`📡 BROADCAST_CHAT: Начало выполнения для админа ${telegramId}`);
+  console.log(`📡 BROADCAST_CHAT: Исходный текст команды: "${text}"`);
+  
+  try {
+    // Извлекаем сообщение из команды
+    const message = text.replace("/broadcast_chat ", "").trim();
+    console.log(`📡 BROADCAST_CHAT: Извлеченное сообщение: "${message}"`);
+    
+    if (!message) {
+      console.log(`📡 BROADCAST_CHAT: Пустое сообщение, отправляем usage`);
+      await sendDirectMessage(telegramId, MSG_BROADCAST_CHAT_USAGE);
+      return;
+    }
+    
+    console.log(`📡 BROADCAST_CHAT: Отправляем уведомление о начале рассылки`);
+    await sendDirectMessage(telegramId, MSG_BROADCAST_STARTING_CHAT);
+    
+    // Получаем пользователей в чате
+    console.log(`📡 BROADCAST_CHAT: Запрашиваем пользователей из БД с in_chat=true`);
+    const { data: users, error } = await supabase
+      .from("users")
+      .select("telegram_id, username")
+      .eq("in_chat", true);
+    
+    if (error) {
+      console.log(`📡 BROADCAST_CHAT: Ошибка запроса к БД:`, error);
+      throw error;
+    }
+    
+    console.log(`📡 BROADCAST_CHAT: Получено пользователей из БД: ${users?.length || 0}`);
+    if (users && users.length > 0) {
+      console.log(`📡 BROADCAST_CHAT: Первые 3 пользователя:`, users.slice(0, 3));
+    }
+    
+    if (!users || users.length === 0) {
+      console.log(`📡 BROADCAST_CHAT: Нет пользователей в чате, отправляем уведомление`);
+      await sendDirectMessage(telegramId, MSG_NO_USERS_IN_CHAT);
+      return;
+    }
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    console.log(`📡 BROADCAST_CHAT: Начинаем рассылку ${users.length} пользователям`);
+    
+    // Отправляем сообщения всем пользователям
+    for (const user of users) {
+      try {
+        console.log(`📡 BROADCAST_CHAT: Отправляем сообщение пользователю ${user.telegram_id} (@${user.username})`);
+        await sendDirectMessage(user.telegram_id, message);
+        successCount++;
+        console.log(`📡 BROADCAST_CHAT: ✅ Успешно отправлено пользователю ${user.telegram_id}`);
+        
+        // Небольшая задержка, чтобы не превысить лимиты Telegram
+        await new Promise(resolve => setTimeout(resolve, 50));
+      } catch (error) {
+        console.error(`📡 BROADCAST_CHAT: ❌ Ошибка отправки сообщения пользователю ${user.telegram_id}:`, error);
+        failCount++;
+      }
+    }
+    
+    console.log(`📡 BROADCAST_CHAT: Рассылка завершена. Успешно: ${successCount}, Ошибок: ${failCount}`);
+    
+    // Отчет админу
+    const report = MSG_BROADCAST_COMPLETED(users.length, successCount, failCount, message, true);
+    await sendDirectMessage(telegramId, report);
+    
+  } catch (error) {
+    console.error("Ошибка в handleBroadcastChatCommand:", error);
+    await sendDirectMessage(telegramId, `❌ Ошибка рассылки: ${error.message}`);
+  }
+}
+
+/**
+ * Рассылка сообщения пользователям НЕ в чате (только для владельца)
+ * Использование: /broadcast_nochat Привет! Возвращайтесь к нам
+ */
+async function handleBroadcastNoChatCommand(telegramId: number, text: string): Promise<void> {
+  try {
+    // Извлекаем сообщение из команды
+    const message = text.replace("/broadcast_nochat ", "").trim();
+    
+    if (!message) {
+      await sendDirectMessage(telegramId, MSG_BROADCAST_NOCHAT_USAGE);
+      return;
+    }
+    
+    await sendDirectMessage(telegramId, MSG_BROADCAST_STARTING_NOCHAT);
+    
+    // Получаем пользователей НЕ в чате
+    const { data: users, error } = await supabase
+      .from("users")
+      .select("telegram_id, username")
+      .eq("in_chat", false);
+    
+    if (error) {
+      throw error;
+    }
+    
+    if (!users || users.length === 0) {
+      await sendDirectMessage(telegramId, MSG_NO_USERS_OUT_CHAT);
+      return;
+    }
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    // Отправляем сообщения всем пользователям
+    for (const user of users) {
+      try {
+        await sendDirectMessage(user.telegram_id, message);
+        successCount++;
+        
+        // Небольшая задержка, чтобы не превысить лимиты Telegram
+        await new Promise(resolve => setTimeout(resolve, 50));
+      } catch (error) {
+        console.error(`Ошибка отправки сообщения пользователю ${user.telegram_id}:`, error);
+        failCount++;
+      }
+    }
+    
+    // Отчет админу
+    const report = MSG_BROADCAST_COMPLETED(users.length, successCount, failCount, message, false);
+    await sendDirectMessage(telegramId, report);
+    
+  } catch (error) {
+    console.error("Ошибка в handleBroadcastNoChatCommand:", error);
+    await sendDirectMessage(telegramId, `❌ Ошибка рассылки: ${error.message}`);
+  }
+}
+
+/**
+ * Массовый вызов команды /status у всех пользователей в чате (только для владельца)
+ */
+async function handleMassStatusCommand(telegramId: number): Promise<void> {
+  try {
+    await sendDirectMessage(telegramId, MSG_MASS_STATUS_STARTING);
+    
+    // Получаем пользователей в чате
+    const { data: users, error } = await supabase
+      .from("users")
+      .select("telegram_id, username")
+      .eq("in_chat", true);
+    
+    if (error) {
+      throw error;
+    }
+    
+    if (!users || users.length === 0) {
+      await sendDirectMessage(telegramId, MSG_NO_USERS_IN_CHAT);
+      return;
+    }
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    // Эмулируем команду /status для каждого пользователя
+    for (const user of users) {
+      try {
+        // Создаем объект сообщения для handleStatusCommand
+        const mockMessage = {
+          from: { id: user.telegram_id },
+          chat: { id: user.telegram_id }
+        };
+        
+        await handleStatusCommand(mockMessage);
+        successCount++;
+        
+        // Небольшая задержка, чтобы не превысить лимиты Telegram
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        console.error(`Ошибка вызова /status для пользователя ${user.telegram_id}:`, error);
+        failCount++;
+      }
+    }
+    
+    // Отчет админу
+    const report = MSG_MASS_STATUS_COMPLETED(users.length, successCount, failCount);
+    await sendDirectMessage(telegramId, report);
+    
+  } catch (error) {
+    console.error("Ошибка в handleMassStatusCommand:", error);
+    await sendDirectMessage(telegramId, `❌ Ошибка массового /status: ${error.message}`);
   }
 }
 

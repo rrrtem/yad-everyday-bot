@@ -390,14 +390,6 @@ export class AdminReporter {
       report += `\n`;
     }
     
-    if (stats.riskyUsers.length > 0) {
-      report += `🚨 На грани исключения (3 страйка):\n`;
-      stats.riskyUsers.forEach((user: any) => {
-        report += `• @${user.username}\n`;
-      });
-      report += `\n`;
-    }
-    
     if (stats.autoPaused.length > 0) {
       report += `⏸️ Автоматически ушли на паузу:\n`;
       stats.autoPaused.forEach((user: any) => {
