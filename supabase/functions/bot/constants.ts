@@ -66,16 +66,18 @@ export const MODE_PACE_CONFIG = {
 };
 
 // Валидные промокоды (позже можно вынести в БД)
-export const VALID_PROMO_CODES = ["YASSS", "FREE10"];
+export const VALID_PROMO_CODES = ["YASSS", "FREE10", "TRY"];
 
 // Типы промокодов
 export const PROMO_TYPES = {
   CLUB_DISCOUNT: "YASSS",    // Дает скидку для участников клуба
-  FREE_DAYS: "FREE10"        // Дает бесплатные дни
+  FREE_DAYS: "FREE10",        // Дает бесплатные дни
+  TRY_DAYS: "TRY"             // Пробный промокод на 3 дня
 };
 
 // Количество бесплатных дней для промокода FREE10
 export const FREE_PROMO_DAYS = 10;
+export const TRY_PROMO_DAYS = 3;
 
 // =====================================================
 // КОМАНДЫ МЕНЮ БОТА

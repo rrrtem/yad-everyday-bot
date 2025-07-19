@@ -35,6 +35,8 @@ export class PromoCodeHandler {
         await this.handleClubDiscountPromo(telegramId, promoCode);
       } else if (promoCode === PROMO_TYPES.FREE_DAYS) {
         await this.handleFreeDaysPromo(telegramId, promoCode);
+      } else if (promoCode === PROMO_TYPES.TRY_DAYS) {
+        await this.handleTryDaysPromo(telegramId, promoCode);
       } else {
         // Неизвестный тип промокода (shouldn't happen if constants are correct)
         await sendDirectMessage(telegramId, MSG_PROMO_ERR);
@@ -170,6 +172,40 @@ export class PromoCodeHandler {
       
     } catch (error) {
       console.error("Ошибка в PromoCodeHandler.handleFreeDaysPromo:", error);
+      await sendDirectMessage(telegramId, "Произошла ошибка. Попробуй еще раз.");
+    }
+  }
+  
+  /**
+   * Обрабатывает промокод TRY - даёт 3 бесплатных дня подписки
+   */
+  private static async handleTryDaysPromo(telegramId: number, promoCode: string): Promise<void> {
+    try {
+      const now = new Date().toISOString();
+      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+      const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
+      const { TRY_PROMO_DAYS } = await import("../../constants.ts");
+      // Начисляем бесплатные дни подписки
+      const { error } = await supabase
+        .from("users")
+        .update({
+          subscription_days_left: TRY_PROMO_DAYS,
+          promo_code: promoCode.toUpperCase(),
+          user_state: null, // Очищаем состояние
+          updated_at: now
+        })
+        .eq("telegram_id", telegramId);
+      if (error) {
+        console.error(`PromoCodeHandler: ошибка обновления БД для TRY промокода:`, error);
+        await sendDirectMessage(telegramId, "Произошла ошибка. Попробуй еще раз.");
+        return;
+      }
+      // Отправляем специальное сообщение для TRY с кнопкой входа в чат
+      await this.sendFreePromoSuccessMessage(telegramId, TRY_PROMO_DAYS);
+    } catch (error) {
+      console.error("Ошибка в PromoCodeHandler.handleTryDaysPromo:", error);
       await sendDirectMessage(telegramId, "Произошла ошибка. Попробуй еще раз.");
     }
   }

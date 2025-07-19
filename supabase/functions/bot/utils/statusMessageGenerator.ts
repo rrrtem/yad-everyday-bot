@@ -13,7 +13,7 @@ interface UserStatusData {
   pace?: 'daily' | 'weekly';
   units_count?: number;
   strikes_count?: number;
-  consecutive_units?: number;
+  consecutive_posts_count?: number;
   last_post_date?: string;
   public_remind?: boolean;
   pause_until?: string;
@@ -186,7 +186,7 @@ function formatActivityStats(user: UserStatusData): string {
   
   let message = `• Всего постов: ${user.units_count}\n`;
   message += `• Пропусков подряд: ${user.strikes_count || 0}\n`;
-  message += `• Дней без пропусков: ${user.consecutive_units || 0}\n\n`;
+  message += `• Дней без пропусков: ${user.consecutive_posts_count || 0}\n\n`;
   message += `\n`;
   message += `Ссылка на чат: ${CHALLENGE_JOIN_LINK}`;
 
