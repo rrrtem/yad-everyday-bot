@@ -14,6 +14,7 @@ export const SUPABASE_CONFIG = {
 } as const;
 
 // Test auto deploy with correct Root Directory - 2025-07-24
+// Auto deploy test #2 - checking GitHub integration - 09:40
 
 // ========== ФИЛЬТРЫ ПОЛЬЗОВАТЕЛЕЙ ==========
 export type UserFilter = 'in_chat' | 'out_chat' | 'never_in_chat' | 'search';
