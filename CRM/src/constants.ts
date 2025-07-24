@@ -153,3 +153,4 @@ export const APP_CONFIG = {
   TITLE: 'YAD Everyday CRM',
   DESCRIPTION: 'Минималистичная CRM-админка для просмотра пользователей'
 } as const; // Test auto deploy
+// Test auto deploy
