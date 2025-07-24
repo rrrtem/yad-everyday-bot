@@ -18,6 +18,9 @@ export class ModeSelectionHandler {
       const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
       const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
       
+      // Фиксируем этап выбора режима
+      await SetupProcess.updateUserState(telegramId, 'waiting_mode');
+
       const { error } = await supabase
         .from("users")
         .update({

@@ -9,7 +9,7 @@ import {
   MSG_SYNC_NO_ACTIVE_USERS,
   MSG_SYNC_COMPLETE,
   MSG_SUBSCRIPTION_EXPIRED_NOTIFICATION,
-  OWNER_TELEGRAM_ID,
+  ADMIN_TELEGRAM_IDS,
   CHALLENGE_JOIN_LINK,
   pluralizeDays
 } from "./constants.ts";
@@ -143,10 +143,17 @@ async function sendTelegramMessageWithChatButton(telegramId: number, text: strin
 }
 
 /**
- * Отправка сообщения админу
+ * Отправка сообщения админам
  */
 async function notifyAdmin(message: string): Promise<void> {
-  await sendTelegramMessage(OWNER_TELEGRAM_ID, message);
+  // Отправляем сообщение всем админам
+  for (const adminId of ADMIN_TELEGRAM_IDS) {
+    try {
+      await sendTelegramMessage(adminId, message);
+    } catch (error) {
+      console.error(`Ошибка отправки сообщения админу ${adminId}:`, error);
+    }
+  }
 }
 
 /**

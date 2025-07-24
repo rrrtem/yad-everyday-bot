@@ -105,6 +105,7 @@ export class PaymentHandler {
         })
       });
       
+      // Фиксируем этап отправки ссылки на оплату
       await this.recordPaymentLinkSent(telegramId);
     } catch (error) {
       console.error("Ошибка в PaymentHandler.sendStandardPaymentLink:", error);
@@ -136,6 +137,7 @@ export class PaymentHandler {
         })
       });
       
+      // Фиксируем этап отправки ссылки на оплату (клуб)
       await this.recordPaymentLinkSent(telegramId);
     } catch (error) {
       console.error("Ошибка в PaymentHandler.sendClubPaymentLink:", error);

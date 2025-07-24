@@ -37,6 +37,10 @@ export class PromoCodeHandler {
         await this.handleFreeDaysPromo(telegramId, promoCode);
       } else if (promoCode === PROMO_TYPES.TRY_DAYS) {
         await this.handleTryDaysPromo(telegramId, promoCode);
+      } else if (promoCode === PROMO_TYPES.TEN_DAYS) {
+        await this.handleTenDaysPromo(telegramId, promoCode);
+      } else if (promoCode === PROMO_TYPES.HUNDRED_DAYS) {
+        await this.handleHundredDaysPromo(telegramId, promoCode);
       } else {
         // Неизвестный тип промокода (shouldn't happen if constants are correct)
         await sendDirectMessage(telegramId, MSG_PROMO_ERR);
@@ -206,6 +210,74 @@ export class PromoCodeHandler {
       await this.sendFreePromoSuccessMessage(telegramId, TRY_PROMO_DAYS);
     } catch (error) {
       console.error("Ошибка в PromoCodeHandler.handleTryDaysPromo:", error);
+      await sendDirectMessage(telegramId, "Произошла ошибка. Попробуй еще раз.");
+    }
+  }
+  
+  /**
+   * Обрабатывает промокод TEN - даёт 10 бесплатных дней подписки
+   */
+  private static async handleTenDaysPromo(telegramId: number, promoCode: string): Promise<void> {
+    try {
+      const now = new Date().toISOString();
+      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+      const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
+      const { TEN_PROMO_DAYS } = await import("../../constants.ts");
+      // Начисляем бесплатные дни подписки
+      const { error } = await supabase
+        .from("users")
+        .update({
+          subscription_days_left: TEN_PROMO_DAYS,
+          promo_code: promoCode.toUpperCase(),
+          user_state: null, // Очищаем состояние
+          updated_at: now
+        })
+        .eq("telegram_id", telegramId);
+      if (error) {
+        console.error(`PromoCodeHandler: ошибка обновления БД для TEN промокода:`, error);
+        await sendDirectMessage(telegramId, "Произошла ошибка. Попробуй еще раз.");
+        return;
+      }
+      // Отправляем специальное сообщение для TEN с кнопкой входа в чат
+      await this.sendFreePromoSuccessMessage(telegramId, TEN_PROMO_DAYS);
+    } catch (error) {
+      console.error("Ошибка в PromoCodeHandler.handleTenDaysPromo:", error);
+      await sendDirectMessage(telegramId, "Произошла ошибка. Попробуй еще раз.");
+    }
+  }
+
+  /**
+   * Обрабатывает промокод DOYOUKNOWWHOIAM - даёт 100 бесплатных дней подписки
+   */
+  private static async handleHundredDaysPromo(telegramId: number, promoCode: string): Promise<void> {
+    try {
+      const now = new Date().toISOString();
+      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+      const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      const supabase = createClient(SUPABASE_URL!, SUPABASE_KEY!);
+      const { HUNDRED_PROMO_DAYS } = await import("../../constants.ts");
+      // Начисляем бесплатные дни подписки
+      const { error } = await supabase
+        .from("users")
+        .update({
+          subscription_days_left: HUNDRED_PROMO_DAYS,
+          promo_code: promoCode.toUpperCase(),
+          user_state: null, // Очищаем состояние
+          updated_at: now
+        })
+        .eq("telegram_id", telegramId);
+      if (error) {
+        console.error(`PromoCodeHandler: ошибка обновления БД для HUNDRED промокода:`, error);
+        await sendDirectMessage(telegramId, "Произошла ошибка. Попробуй еще раз.");
+        return;
+      }
+      // Отправляем специальное сообщение для HUNDRED с кнопкой входа в чат
+      await this.sendFreePromoSuccessMessage(telegramId, HUNDRED_PROMO_DAYS);
+    } catch (error) {
+      console.error("Ошибка в PromoCodeHandler.handleHundredDaysPromo:", error);
       await sendDirectMessage(telegramId, "Произошла ошибка. Попробуй еще раз.");
     }
   }

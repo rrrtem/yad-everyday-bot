@@ -9,7 +9,7 @@ interface UserStatusData {
   subscription_days_left: number;
   subscription_active: boolean;
   expires_at?: string;
-  mode?: 'text' | 'image';
+  mode?: 'text';
   pace?: 'daily' | 'weekly';
   units_count?: number;
   strikes_count?: number;
@@ -162,18 +162,10 @@ function formatUnclearStatus(user: UserStatusData): string {
  * Форматирует информацию о режиме и ритме участия
  */
 function formatParticipationInfo(user: UserStatusData): string {
-  const modeText = user.mode === 'text' ? 'Тексты' : 
-                   user.mode === 'image' ? 'Картинки' : '❓ Не выбран';
+  const mode = user.mode === 'text' ? 'Тексты' : '❓ Не выбран';
+  const pace = user.pace === 'daily' ? 'Каждый день' : user.pace === 'weekly' ? 'Раз в неделю' : '❓ Не выбран';
   
-  const paceText = user.pace === 'daily' ? 'Каждый день' : 
-                   user.pace === 'weekly' ? 'Раз в неделю' : '❓ Не выбран';
-  
-  const remindersText = user.public_remind !== false ? 'включены' : 'отключены';
-  
-  return `• Режим: ${modeText}
-• Ритм: ${paceText}
-• Публичные напоминания: ${remindersText}\n
-`;
+  return `📝 **Режим:** ${mode}\n⏰ **Ритм:** ${pace}`;
 }
 
 /**

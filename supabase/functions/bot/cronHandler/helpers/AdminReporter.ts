@@ -1,7 +1,7 @@
 import { ProcessingStats, User } from "./UserProcessor.ts";
 import { ChatManager } from "./ChatManager.ts";
 import { 
-  OWNER_TELEGRAM_ID
+  ADMIN_TELEGRAM_IDS
 } from "../../constants.ts";
 
 /**
@@ -14,17 +14,24 @@ export class AdminReporter {
    * Отправка ежедневного отчета (dailyCron и allInfo) с детализацией по пользователям
    */
   static async sendDailyCronReport(stats: ProcessingStats, reportType: 'daily' | 'allinfo' = 'daily', users?: User[]): Promise<void> {
-    // console.log(`📤 Отправляем ${reportType} отчет владельцу (${OWNER_TELEGRAM_ID})`);
+    // console.log(`📤 Отправляем ${reportType} отчет админам (${ADMIN_TELEGRAM_IDS.join(', ')})`);
     
     try {
       const report = users 
         ? this.formatDetailedDailyCronReport(stats, reportType, users)
         : this.formatDailyCronReport(stats, reportType);
         
-      await ChatManager.sendDirectMessage(OWNER_TELEGRAM_ID, report);
-      // console.log(`✅ ${reportType} отчет отправлен владельцу`);
+      // Отправляем отчет всем админам
+      for (const adminId of ADMIN_TELEGRAM_IDS) {
+        try {
+          await ChatManager.sendDirectMessage(adminId, report);
+        } catch (err) {
+          console.error(`❌ Ошибка отправки ${reportType} отчета админу ${adminId}:`, err);
+        }
+      }
+      // console.log(`✅ ${reportType} отчет отправлен всем админам`);
     } catch (err) {
-      console.error(`❌ Ошибка отправки ${reportType} отчета владельцу:`, err);
+      console.error(`❌ Ошибка отправки ${reportType} отчета админам:`, err);
       throw err; // Перебрасываем ошибку для обработки выше
     }
   }
@@ -38,14 +45,21 @@ export class AdminReporter {
     noPostsThisWeek: number;
     updatedUsers: Array<{username: string, unitsCount: number, consecutivePosts: number}>;
   }): Promise<void> {
-    // console.log(`📤 Отправляем weekly отчет владельцу (${OWNER_TELEGRAM_ID})`);
+    // console.log(`📤 Отправляем weekly отчет админам (${ADMIN_TELEGRAM_IDS.join(', ')})`);
     
     try {
       const report = this.formatWeeklyReport(stats);
-      await ChatManager.sendDirectMessage(OWNER_TELEGRAM_ID, report);
-      // console.log(`✅ Weekly отчет отправлен владельцу`);
+      // Отправляем отчет всем админам
+      for (const adminId of ADMIN_TELEGRAM_IDS) {
+        try {
+          await ChatManager.sendDirectMessage(adminId, report);
+        } catch (err) {
+          console.error(`❌ Ошибка отправки weekly отчета админу ${adminId}:`, err);
+        }
+      }
+      // console.log(`✅ Weekly отчет отправлен всем админам`);
     } catch (err) {
-      console.error(`❌ Ошибка отправки weekly отчета владельцу:`, err);
+      console.error(`❌ Ошибка отправки weekly отчета админам:`, err);
       throw err;
     }
   }
@@ -54,12 +68,19 @@ export class AdminReporter {
    * Отправка отчета об ошибке
    */
   static async sendErrorReport(error: Error, operation: string, additionalInfo?: string): Promise<void> {
-    console.log(`🚨 Sending error report to admin`);
+    console.log(`🚨 Sending error report to admins`);
     
     try {
       const report = this.formatErrorReport(error, operation, additionalInfo);
-      await ChatManager.sendDirectMessage(OWNER_TELEGRAM_ID, report);
-      // console.log(`✅ Отчет об ошибке отправлен владельцу`);
+      // Отправляем отчет всем админам
+      for (const adminId of ADMIN_TELEGRAM_IDS) {
+        try {
+          await ChatManager.sendDirectMessage(adminId, report);
+        } catch (err) {
+          console.error(`❌ Ошибка отправки отчета об ошибке админу ${adminId}:`, err);
+        }
+      }
+      // console.log(`✅ Отчет об ошибке отправлен всем админам`);
     } catch (err) {
       console.error(`❌ Критическая ошибка отправки отчета об ошибке:`, err);
       // Не перебрасываем ошибку, чтобы не создать рекурсию
@@ -515,8 +536,15 @@ export class AdminReporter {
   static async sendQuickStats(message: string): Promise<void> {
     try {
       const report = `📊 Быстрая статистика:\n\n${message}\n\n🕐 ${new Date().toISOString()}`;
-      await ChatManager.sendDirectMessage(OWNER_TELEGRAM_ID, report);
-      console.log(`✅ Быстрая статистика отправлена`);
+      // Отправляем отчет всем админам
+      for (const adminId of ADMIN_TELEGRAM_IDS) {
+        try {
+          await ChatManager.sendDirectMessage(adminId, report);
+        } catch (err) {
+          console.error(`❌ Ошибка отправки быстрой статистики админу ${adminId}:`, err);
+        }
+      }
+      console.log(`✅ Быстрая статистика отправлена всем админам`);
     } catch (err) {
       console.error(`❌ Ошибка отправки быстрой статистики:`, err);
     }

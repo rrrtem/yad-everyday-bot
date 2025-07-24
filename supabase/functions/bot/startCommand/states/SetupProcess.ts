@@ -19,7 +19,8 @@ export class SetupProcess {
    * Запускает процесс выбора режима
    */
   static async startModeSelection(telegramId: number): Promise<void> {
-    await this.updateUserState(telegramId, "waiting_mode");
+    // Фиксируем этап начала онбординга
+    await this.updateUserState(telegramId, 'waiting_mode');
     await this.sendModeSelection(telegramId);
   }
   
@@ -30,7 +31,6 @@ export class SetupProcess {
     const keyboard = {
       inline_keyboard: [
         [{ text: "📝 Тексты", callback_data: `mode_${AVAILABLE_MODES.TEXT}` }],
-        [{ text: "📸 Картинки", callback_data: `mode_${AVAILABLE_MODES.IMAGE}` }],
         [{ text: BUTTON_TEXT_RESET, callback_data: CALLBACK_RESET }]
       ]
     };
@@ -51,7 +51,8 @@ export class SetupProcess {
    * Отправляет сообщение с выбором промокода
    */
   static async sendPromoSelection(telegramId: number): Promise<void> {
-    await this.updateUserState(telegramId, "waiting_promo");
+    // Фиксируем этап ожидания промокода
+    await this.updateUserState(telegramId, 'waiting_promo');
     
     const keyboard = {
       inline_keyboard: [
@@ -82,6 +83,8 @@ export class SetupProcess {
   
   /**
    * Обновляет состояние пользователя в БД
+   * @param telegramId - Telegram ID пользователя
+   * @param state - Строка состояния (например, 'waiting_mode', 'waiting_promo', 'payment_link_sent', 'in_waitlist')
    */
   private static async updateUserState(telegramId: number, state: string): Promise<void> {
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");

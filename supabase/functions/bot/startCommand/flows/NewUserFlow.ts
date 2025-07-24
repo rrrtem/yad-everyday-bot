@@ -26,6 +26,18 @@ export class NewUserFlow {
     // Проверяем и создаем пользователя
     await registerUser(context.telegramUserData);
 
+    // Уведомляем администраторов о новом пользователе
+    const { ADMIN_TELEGRAM_IDS } = await import("../../constants.ts");
+    const username = context.telegramUserData.username ? `@${context.telegramUserData.username}` : "без ника";
+    const notifyMsg = `Новый пользователь: ${username} (id: ${telegramId})`;
+    for (const adminId of ADMIN_TELEGRAM_IDS) {
+      try {
+        await sendDirectMessage(adminId, notifyMsg);
+      } catch (e) {
+        console.error(`Ошибка отправки уведомления админу ${adminId}:`, e);
+      }
+    }
+
     // Проверяем, нужно ли добавлять в waitlist
     const shouldWaitlist = await WaitlistFlow.shouldAddToWaitlist();
     // console.log(`NewUserFlow: shouldWaitlist=${shouldWaitlist}`);

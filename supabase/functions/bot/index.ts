@@ -24,7 +24,7 @@ import {
   handleChangeModeCallbackQuery,
   handleChangePaceCallbackQuery
 } from "./statusCallbackHandlers.ts";
-import { OWNER_TELEGRAM_ID } from "./constants.ts";
+import { isAdmin } from "./constants.ts";
 import { BotMenuManager } from "./utils/botMenuManager.ts";
 
 // Переменные окружения и API Telegram
@@ -236,7 +236,7 @@ Deno.serve(async (req) => {
       const chatType = message.chat.type;
 
       console.log(`Processing message: ${text} from chat type: ${chatType}`);
-      console.log(`User ID: ${message.from.id}, Owner ID: ${OWNER_TELEGRAM_ID}, Is Owner: ${message.from.id === OWNER_TELEGRAM_ID}`);
+      console.log(`User ID: ${message.from.id}, Is Admin: ${isAdmin(message.from.id)}`);
 
       // Команды бота
       if (text === "/start") {
@@ -285,8 +285,8 @@ Deno.serve(async (req) => {
           }
       } else if (/\B#daily\b/i.test(text)) {
         await handleDailyPost(message);
-      } else if (chatType === "private" && message.from.id === OWNER_TELEGRAM_ID && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions", "/slots", "/test_slots", "/close_slots", "/force_update_commands", "/mass_status"].includes(text) || text.startsWith("/test_webhook ") || text.startsWith("/open") || text.startsWith("/broadcast_chat ") || text.startsWith("/broadcast_nochat "))) {
-        console.log(`🔑 OWNER COMMAND DETECTED: "${text}" from user ${message.from.id} (owner: ${OWNER_TELEGRAM_ID})`);
+      } else if (chatType === "private" && isAdmin(message.from.id) && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions", "/slots", "/test_slots", "/close_slots", "/force_update_commands", "/mass_status"].includes(text) || text.startsWith("/test_webhook ") || text.startsWith("/open") || text.startsWith("/broadcast_chat ") || text.startsWith("/broadcast_nochat "))) {
+        console.log(`🔑 ADMIN COMMAND DETECTED: "${text}" from user ${message.from.id}`);
         await handleOwnerCommands(message);
             } else if (chatType === "private" && text && !text.startsWith("/")) {
         // Умная обработка текстовых сообщений в зависимости от состояния пользователя
@@ -294,8 +294,8 @@ Deno.serve(async (req) => {
       } else if (text.startsWith("/")) {
         // Неизвестная команда
         console.log(`❓ UNKNOWN COMMAND: "${text}" from user ${message.from.id} (chat: ${chatType})`);
-        if (message.from.id === OWNER_TELEGRAM_ID) {
-          console.log(`❗ This was from OWNER but didn't match owner commands pattern!`);
+        if (isAdmin(message.from.id)) {
+          console.log(`❗ This was from ADMIN but didn't match admin commands pattern!`);
         }
       }
     }

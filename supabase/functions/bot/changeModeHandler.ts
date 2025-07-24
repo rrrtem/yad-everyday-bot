@@ -8,9 +8,7 @@ import {
   MSG_CHANGE_MODE_ALL_SET,
   AVAILABLE_MODES,
   CALLBACK_CHANGE_MODE_TEXT,
-  CALLBACK_CHANGE_MODE_IMAGE,
-  PUBLIC_REMINDER_THREAD_ID_TEXT,
-  PUBLIC_REMINDER_THREAD_ID_IMAGE
+  PUBLIC_REMINDER_THREAD_ID_TEXT
 } from "./constants.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -36,11 +34,6 @@ async function sendModeSelectionMessage(telegramId: number, currentMode: string)
     // Добавляем кнопку "Тексты" только если текущий режим не "text"
     if (currentMode !== AVAILABLE_MODES.TEXT) {
       availableButtons.push([{ text: "📝 Тексты", callback_data: CALLBACK_CHANGE_MODE_TEXT }]);
-    }
-    
-    // Добавляем кнопку "Картинки" только если текущий режим не "image"
-    if (currentMode !== AVAILABLE_MODES.IMAGE) {
-      availableButtons.push([{ text: "🎨 Картинки", callback_data: CALLBACK_CHANGE_MODE_IMAGE }]);
     }
 
     // Если нет доступных для переключения режимов, отправляем сообщение без кнопок
@@ -81,8 +74,7 @@ async function sendModeSelectionMessage(telegramId: number, currentMode: string)
  * Получает информацию о топике для режима
  */
 function getThreadInfo(mode: string): string {
-  const threadId = mode === AVAILABLE_MODES.TEXT ? PUBLIC_REMINDER_THREAD_ID_TEXT : PUBLIC_REMINDER_THREAD_ID_IMAGE;
-  const threadName = mode === AVAILABLE_MODES.TEXT ? 'Тексты' : 'Картинки';
+  const threadId = PUBLIC_REMINDER_THREAD_ID_TEXT;
   return `Теперь присылай апдейты сюда: https://t.me/c/2366470605/${threadId}`;
 }
 
@@ -150,8 +142,6 @@ export async function handleChangeModeCallback(callbackQuery: any): Promise<void
     
     if (callbackData === CALLBACK_CHANGE_MODE_TEXT) {
       selectedMode = AVAILABLE_MODES.TEXT;
-    } else if (callbackData === CALLBACK_CHANGE_MODE_IMAGE) {
-      selectedMode = AVAILABLE_MODES.IMAGE;
     } else {
       // console.log(`handleChangeModeCallback: неизвестный callback_data: ${callbackData}`);
       return;
@@ -223,7 +213,7 @@ export async function handleChangeModeCallback(callbackQuery: any): Promise<void
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         callback_query_id: callbackQuery.id,
-        text: `Режим изменён на ${selectedMode === AVAILABLE_MODES.TEXT ? 'Тексты' : 'Картинки'}!`
+        text: `Режим изменён на Тексты!`
       })
     });
 
@@ -248,4 +238,4 @@ export async function handleChangeModeCallback(callbackQuery: any): Promise<void
       console.error("Ошибка при ответе на callback query:", callbackError);
     }
   }
-} 
+}

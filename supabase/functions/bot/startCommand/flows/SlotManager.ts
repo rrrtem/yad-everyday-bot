@@ -1,5 +1,5 @@
 import { sendDirectMessage } from "../../userHandler.ts";
-import { OWNER_TELEGRAM_ID, MSG_SLOTS_FILLED } from "../../constants.ts";
+import { ADMIN_TELEGRAM_IDS, MSG_SLOTS_FILLED } from "../../constants.ts";
 
 /**
  * Менеджер для управления системой динамических слотов
@@ -229,10 +229,17 @@ export class SlotManager {
    */
   private static async notifyAdminSlotsFilled(): Promise<void> {
     try {
-      console.log(`SlotManager: All slots filled, notifying admin ${OWNER_TELEGRAM_ID}`);
-      await sendDirectMessage(OWNER_TELEGRAM_ID, MSG_SLOTS_FILLED);
+      console.log(`SlotManager: All slots filled, notifying admins ${ADMIN_TELEGRAM_IDS.join(', ')}`);
+      // Отправляем уведомление всем админам
+      for (const adminId of ADMIN_TELEGRAM_IDS) {
+        try {
+          await sendDirectMessage(adminId, MSG_SLOTS_FILLED);
+        } catch (error) {
+          console.error(`Ошибка уведомления админа ${adminId} о заполнении слотов:`, error);
+        }
+      }
     } catch (error) {
-      console.error("Ошибка уведомления админа о заполнении слотов:", error);
+      console.error("Ошибка уведомления админов о заполнении слотов:", error);
     }
   }
 }

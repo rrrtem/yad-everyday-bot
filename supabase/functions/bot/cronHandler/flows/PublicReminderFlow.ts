@@ -31,7 +31,7 @@ export class PublicReminderFlow {
     
     try {
       // Вычисляем время до конца дня
-      const { diffHours, diffMinutes, timeLeftMsg } = ReportGenerator.calculateTimeUntilEndOfDay(now);
+      // const { diffHours, diffMinutes, timeLeftMsg } = ReportGenerator.calculateTimeUntilEndOfDay(now);
       // console.log(`⏰ До конца дня (04:00 UTC): ${diffHours}ч ${diffMinutes}мин`);
 
       // Получаем пользователей, которым нужно напомнить
@@ -45,7 +45,7 @@ export class PublicReminderFlow {
       // console.log(`💬 Текст напоминания: "${timeLeftMsg}"`);
 
       // Отправляем напоминания
-      const { sent: sentReminders, usernames: allUsernames } = await ReportGenerator.sendPublicReminders(users, timeLeftMsg);
+      const { sent: sentReminders, usernames: allUsernames } = await ReportGenerator.sendPublicReminders(users);
 
       // Финальная статистика
       const endTime = Date.now();

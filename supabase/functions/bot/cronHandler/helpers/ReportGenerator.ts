@@ -1,9 +1,8 @@
-import { ProcessingStats, User } from "./UserProcessor.ts";
 import { ChatManager } from "./ChatManager.ts";
+import { ProcessingStats, User } from "./UserProcessor.ts";
 import { 
   MSG_PUBLIC_DEADLINE_REMINDER,
-  PUBLIC_REMINDER_THREAD_ID_TEXT,
-  PUBLIC_REMINDER_THREAD_ID_IMAGE
+  PUBLIC_REMINDER_THREAD_ID_TEXT
 } from "../../constants.ts";
 
 /**
@@ -13,67 +12,19 @@ export class ReportGenerator {
 
 
   /**
-   * Отправка публичных напоминаний
+   * Отправляет публичные напоминания пользователям (упрощённая версия)
    */
-  static async sendPublicReminders(users: User[], timeLeftMsg: string): Promise<{sent: number, usernames: string[]}> {
-    const now = new Date();
-    const allUsernames: string[] = [];
-    let sentReminders = 0;
-    
-    // Фильтруем пользователей по условиям для напоминания
-    const textUsers = users.filter(u => 
-      u.in_chat && 
-      u.pace === "daily" &&
-      (!u.pause_until || new Date(u.pause_until) <= now) &&
-      u.public_remind && 
-      !u.post_today && 
-      u.mode?.trim() === "text" &&
-      u.username
-    );
-    
-    const imageUsers = users.filter(u => 
-      u.in_chat && 
-      u.pace === "daily" &&
-      (!u.pause_until || new Date(u.pause_until) <= now) &&
-      u.public_remind && 
-      !u.post_today && 
-      u.mode?.trim() === "image" &&
-      u.username
-    );
-    
-    console.log(`🎯 Пользователи для напоминания (ТОЛЬКО pace="daily"):`);
-    console.log(`   - Режим "text": ${textUsers.length} чел.`);
-    console.log(`   - Режим "image": ${imageUsers.length} чел.`);
-    
-    // Отправляем напоминание для текстовиков
-    if (textUsers.length > 0) {
-      console.log(`📤 Отправляем напоминание для text пользователей в тред ${PUBLIC_REMINDER_THREAD_ID_TEXT}...`);
-      const usernames = textUsers.map(u => u.username).filter((name): name is string => !!name);
-      allUsernames.push(...usernames);
-      const text = MSG_PUBLIC_DEADLINE_REMINDER(usernames, timeLeftMsg);
-      
-      const success = await ChatManager.sendGroupMessage(text, PUBLIC_REMINDER_THREAD_ID_TEXT);
-      if (success) {
-        console.log(`✅ Напоминание для text пользователей отправлено`);
-        sentReminders++;
-      }
+  static async sendPublicReminders(users: User[]): Promise<{sent: number, usernames: string[]}> {
+    console.log(`📤 Отправляем публичное напоминание...`);
+    const text = 'Ждем ваш текст!';
+    const success = await ChatManager.sendGroupMessage(text, PUBLIC_REMINDER_THREAD_ID_TEXT);
+    if (success) {
+      console.log(`✅ Напоминание отправлено`);
+      return { sent: 1, usernames: [] };
+    } else {
+      console.log(`❌ Ошибка отправки напоминания`);
+      return { sent: 0, usernames: [] };
     }
-
-    // Отправляем напоминание для картинщиков
-    if (imageUsers.length > 0) {
-      console.log(`📤 Отправляем напоминание для image пользователей в тред ${PUBLIC_REMINDER_THREAD_ID_IMAGE}...`);
-      const usernames = imageUsers.map(u => u.username).filter((name): name is string => !!name);
-      allUsernames.push(...usernames);
-      const text = MSG_PUBLIC_DEADLINE_REMINDER(usernames, timeLeftMsg);
-      
-      const success = await ChatManager.sendGroupMessage(text, PUBLIC_REMINDER_THREAD_ID_IMAGE);
-      if (success) {
-        console.log(`✅ Напоминание для image пользователей отправлено`);
-        sentReminders++;
-      }
-    }
-
-    return { sent: sentReminders, usernames: allUsernames };
   }
 
   /**
@@ -95,7 +46,7 @@ export class ReportGenerator {
 
     let timeLeftMsg = "";
     if (diffHours > 0) {
-      timeLeftMsg = `До конца дня осталось ${diffHours} ${this.pluralizeHours(diffHours)}!`;
+      timeLeftMsg = `Ждем ваш текст!`;
     } else {
       timeLeftMsg = `До конца дня осталось меньше часа! (${diffMinutes} минут)`;
     }

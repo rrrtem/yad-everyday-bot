@@ -6,7 +6,6 @@ import { handleChangePaceCommand } from "./changePaceHandler.ts";
 import { BotMenuManager } from "./utils/botMenuManager.ts";
 import {
   CALLBACK_CHANGE_MODE_TEXT,
-  CALLBACK_CHANGE_MODE_IMAGE,
   CALLBACK_CHANGE_PACE_DAILY,
   CALLBACK_CHANGE_PACE_WEEKLY,
   AVAILABLE_MODES,
@@ -245,15 +244,13 @@ export async function handleChooseModeCallbackQuery(callbackQuery: any): Promise
     // Отправляем меню выбора режима
     const keyboard = {
       inline_keyboard: [
-        [{ text: "📝 Тексты", callback_data: CALLBACK_CHANGE_MODE_TEXT }],
-        [{ text: "🎨 Картинки", callback_data: CALLBACK_CHANGE_MODE_IMAGE }]
+        [{ text: "📝 Тексты", callback_data: CALLBACK_CHANGE_MODE_TEXT }]
       ]
     };
     
     const message = `Выбери режим участия:
 
-• **Тексты** — эссе, наблюдения за собой или миром, дневники, посты, анонсы и любые другие жанры
-• **Картинки** — скетчи, иллюстрации, коллажи, постеры и другой графический дизайн`;
+• **Тексты** — эссе, наблюдения за собой или миром, дневники, посты, анонсы и любые другие жанры`;
     
     await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: "POST",
@@ -293,27 +290,17 @@ export async function handleChoosePaceCallbackQuery(callbackQuery: any): Promise
     let keyboard;
     let message;
     
-    if (user.mode === AVAILABLE_MODES.IMAGE) {
-      // Для картинок только ежедневный ритм
-      keyboard = {
-        inline_keyboard: [
-          [{ text: "⚡ Каждый день", callback_data: CALLBACK_CHANGE_PACE_DAILY }]
-        ]
-      };
-      message = `📸 Для режима "Картинки" доступен только ритм **"Каждый день"**.`;
-    } else {
-      // Для текстов оба ритма
-      keyboard = {
-        inline_keyboard: [
-          [{ text: "⚡ Каждый день", callback_data: CALLBACK_CHANGE_PACE_DAILY }],
-          [{ text: "📅 Раз в неделю", callback_data: CALLBACK_CHANGE_PACE_WEEKLY }]
-        ]
-      };
-      message = `⏰ Выбери ритм участия:
+    // Для всех режимов доступны оба ритма
+    keyboard = {
+      inline_keyboard: [
+        [{ text: "⚡ Каждый день", callback_data: CALLBACK_CHANGE_PACE_DAILY }],
+        [{ text: "📅 Раз в неделю", callback_data: CALLBACK_CHANGE_PACE_WEEKLY }]
+      ]
+    };
+    message = `⏰ Выбери ритм участия:
 
 • **Каждый день** — публикуешь пост ежедневно
 • **Один раз в неделю** — публикуешь пост раз в неделю`;
-    }
     
     await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: "POST",
