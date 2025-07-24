@@ -1,51 +1,45 @@
 import * as Tabs from '@radix-ui/react-tabs';
-import React, { useState } from 'react';
-
-export type FilterTab = 'in_chat' | 'out_chat' | 'never_in_chat' | 'search';
+import React from 'react';
+import { 
+  FILTER_LABELS
+} from '@/constants';
+import type { UserFilter } from '@/constants';
 
 interface FiltersProps {
-  value: FilterTab;
-  onChange: (tab: FilterTab) => void;
-  searchQuery: string;
-  onSearch: (query: string) => void;
+  value: UserFilter;
+  onChange: (tab: UserFilter) => void;
+  filterStats?: Record<string, number>;
 }
 
-export const Filters: React.FC<FiltersProps> = ({ value, onChange, searchQuery, onSearch }) => {
-  const [localSearch, setLocalSearch] = useState(searchQuery);
+export const Filters: React.FC<FiltersProps> = ({ value, onChange, filterStats = {} }) => {
+  const handleValueChange = (value: string) => {
+    onChange(value as UserFilter);
+  };
+
+  const getFilterLabel = (filterKey: string, baseLabel: string) => {
+    const count = filterStats[filterKey];
+    return count !== undefined ? `${baseLabel} (${count})` : baseLabel;
+  };
 
   return (
-    <Tabs.Root value={value} onValueChange={onChange} className="w-full mb-4">
-      <Tabs.List className="flex gap-2 border-b border-gray-200 mb-2">
-        <Tabs.Trigger value="in_chat" className={tabClass(value === 'in_chat')}>В чате</Tabs.Trigger>
-        <Tabs.Trigger value="out_chat" className={tabClass(value === 'out_chat')}>Вышел</Tabs.Trigger>
-        <Tabs.Trigger value="never_in_chat" className={tabClass(value === 'never_in_chat')}>Никогда не был</Tabs.Trigger>
-        <Tabs.Trigger value="search" className={tabClass(value === 'search')}>Поиск</Tabs.Trigger>
+    <Tabs.Root value={value} onValueChange={handleValueChange} className="w-full">
+      <Tabs.List className="flex gap-6">
+        <Tabs.Trigger value="in_chat" className={simpleTabClass(value === 'in_chat')}>
+          {getFilterLabel('in_chat', FILTER_LABELS.in_chat)}
+        </Tabs.Trigger>
+        <Tabs.Trigger value="out_chat" className={simpleTabClass(value === 'out_chat')}>
+          {getFilterLabel('out_chat', FILTER_LABELS.out_chat)}
+        </Tabs.Trigger>
+        <Tabs.Trigger value="never_in_chat" className={simpleTabClass(value === 'never_in_chat')}>
+          {getFilterLabel('never_in_chat', FILTER_LABELS.never_in_chat)}
+        </Tabs.Trigger>
       </Tabs.List>
-      {value === 'search' && (
-        <div className="mt-2 flex gap-2">
-          <input
-            type="text"
-            className="border rounded px-2 py-1 w-64"
-            placeholder="Username или Telegram ID"
-            value={localSearch}
-            onChange={e => setLocalSearch(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') onSearch(localSearch); }}
-          />
-          <button
-            className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-            onClick={() => onSearch(localSearch)}
-          >
-            Найти
-          </button>
-        </div>
-      )}
     </Tabs.Root>
   );
 };
 
-function tabClass(active: boolean) {
-  return (
-    'px-4 py-2 rounded-t font-medium ' +
-    (active ? 'bg-white border-x border-t border-gray-200 text-blue-600' : 'text-gray-500 hover:text-blue-600')
-  );
+function simpleTabClass(active: boolean) {
+  return active 
+    ? 'text-black font-medium border-b-2 border-black pb-1 text-sm'
+    : 'text-gray-500 font-medium pb-1 text-sm hover:text-gray-700';
 } 

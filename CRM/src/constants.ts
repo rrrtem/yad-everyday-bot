@@ -16,14 +16,13 @@ export const SUPABASE_CONFIG = {
 // Test auto deploy with correct Root Directory - 2025-07-24
 // Auto deploy test #2 - checking GitHub integration - 09:40
 
-// ========== ФИЛЬТРЫ ПОЛЬЗОВАТЕЛЕЙ ==========
-export type UserFilter = 'in_chat' | 'out_chat' | 'never_in_chat' | 'search';
+// ========== ФИЛЬТРЫ ==========
+export type UserFilter = 'in_chat' | 'out_chat' | 'never_in_chat';
 
 export const FILTER_LABELS = {
   in_chat: 'В чате',
-  out_chat: 'Вышел',
-  never_in_chat: 'Никогда не был',
-  search: 'Поиск'
+  out_chat: 'Вышли', 
+  never_in_chat: 'Не заходили'
 } as const;
 
 // ========== СОРТИРОВКА ==========
@@ -70,7 +69,6 @@ export interface User {
 // ========== СООБЩЕНИЯ UI ==========
 export const UI_MESSAGES = {
   LOGIN: {
-    TITLE: 'Вход в CRM',
     INVALID_CREDENTIALS: 'Неверный логин или пароль',
     LOGIN_PLACEHOLDER: 'Логин',
     PASSWORD_PLACEHOLDER: 'Пароль',
@@ -82,15 +80,6 @@ export const UI_MESSAGES = {
   },
   EMPTY_STATES: {
     NO_USERS: 'Нет пользователей'
-  },
-  SEARCH: {
-    PLACEHOLDER: 'Username или Telegram ID',
-    BUTTON: 'Найти'
-  },
-  SORT: {
-    LABEL: 'Сортировка:',
-    ASC_SYMBOL: '↑',
-    DESC_SYMBOL: '↓'
   },
   USER_STATUS: {
     IN_CHAT: 'В чате',
@@ -130,30 +119,55 @@ export const USER_FIELDS_LABELS = {
 
 // ========== СТИЛИ КОМПОНЕНТОВ ==========
 export const STYLES = {
-  TAB_ACTIVE: 'px-4 py-2 rounded-t font-medium bg-white border-x border-t border-gray-200 text-blue-600',
-  TAB_INACTIVE: 'px-4 py-2 rounded-t font-medium text-gray-500 hover:text-blue-600',
-  BUTTON_PRIMARY: 'bg-blue-600 text-white py-2 rounded hover:bg-blue-700 font-semibold',
-  BUTTON_SECONDARY: 'bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600',
-  INPUT: 'border rounded px-3 py-2',
-  INPUT_SEARCH: 'border rounded px-2 py-1 w-64',
-  CARD: 'bg-white rounded-lg shadow p-4 mb-4 flex flex-col gap-2 border border-gray-100',
-  CONTAINER: 'max-w-4xl mx-auto p-4',
-  LOGIN_FORM: 'max-w-xs mx-auto mt-32 bg-white p-6 rounded shadow flex flex-col gap-4'
+  // Табы
+  TAB_ACTIVE: 'px-6 py-3 rounded-lg font-medium bg-blue-50 border border-blue-200 text-blue-700 transition-all duration-200',
+  TAB_INACTIVE: 'px-6 py-3 rounded-lg font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-all duration-200',
+  
+  // Кнопки
+  BUTTON_PRIMARY: 'bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium transition-all duration-200 shadow-sm hover:shadow-md',
+  BUTTON_SECONDARY: 'bg-white text-blue-600 border border-blue-200 px-4 py-2 rounded-lg hover:bg-blue-50 font-medium transition-all duration-200',
+  BUTTON_SORT: 'bg-white border border-gray-200 px-3 py-2 rounded-lg hover:bg-gray-50 transition-all duration-200 min-w-[120px]',
+  
+  // Инпуты
+  INPUT: 'border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200',
+  INPUT_SEARCH: 'border border-gray-200 rounded-lg px-4 py-2 w-80 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200',
+  
+  // Карточки
+  CARD: 'bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-all duration-200 group',
+  CARD_HEADER: 'flex items-start justify-between mb-4 pb-4 border-b border-gray-100',
+  CARD_SECTION: 'mb-6 last:mb-0',
+  CARD_SECTION_TITLE: 'text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3',
+  
+  // Контейнеры
+  CONTAINER: 'max-w-7xl mx-auto px-6 py-8',
+  CONTENT_WRAPPER: 'bg-gray-50 min-h-screen',
+  DASHBOARD_HEADER: 'bg-white border-b border-gray-200 mb-8',
+  DASHBOARD_TITLE: 'text-2xl font-bold text-gray-900 mb-2',
+  DASHBOARD_SUBTITLE: 'text-gray-600',
+  
+  // Формы
+  LOGIN_FORM: 'max-w-md mx-auto mt-32 bg-white p-8 rounded-xl shadow-lg border border-gray-100',
+  FORM_GROUP: 'mb-6',
+  FORM_LABEL: 'block text-sm font-medium text-gray-700 mb-2',
+  
+  // Статусы и бейджи
+  BADGE_BASE: 'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium',
+  STATUS_INDICATOR: 'w-2 h-2 rounded-full mr-2',
+  
+  // Утилиты
+  DIVIDER: 'border-t border-gray-200 my-6',
+  HOVER_CARD: 'hover:bg-gray-50 transition-colors duration-150 rounded-lg p-2',
 } as const;
 
 // ========== ЦВЕТА СТАТУСОВ ==========
 export const STATUS_COLORS = {
-  SUCCESS: 'text-green-600',
-  ERROR: 'text-red-500',
-  WARNING: 'text-yellow-600',
-  INFO: 'text-blue-600',
-  SECONDARY: 'text-purple-600',
-  MUTED: 'text-gray-400'
+  SUCCESS: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+  ERROR: 'text-red-700 bg-red-50 border-red-200',
+  WARNING: 'text-amber-700 bg-amber-50 border-amber-200', 
+  INFO: 'text-blue-700 bg-blue-50 border-blue-200',
+  SECONDARY: 'text-purple-700 bg-purple-50 border-purple-200',
+  MUTED: 'text-gray-500 bg-gray-50 border-gray-200',
+  NEUTRAL: 'text-gray-700 bg-gray-100 border-gray-200'
 } as const;
 
-// ========== НАСТРОЙКИ ПРИЛОЖЕНИЯ ==========
-export const APP_CONFIG = {
-  TITLE: 'YAD Everyday CRM',
-  DESCRIPTION: 'Минималистичная CRM-админка для просмотра пользователей'
-} as const; // Test auto deploy
-// Test auto deploy
+

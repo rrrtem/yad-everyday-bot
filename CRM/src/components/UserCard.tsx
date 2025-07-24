@@ -1,45 +1,200 @@
 import React from 'react';
-import { User } from '../api/users';
+import { UI_MESSAGES } from '@/constants';
+import type { User } from '@/constants';
 
 interface UserCardProps {
   user: User;
 }
 
 export const UserCard: React.FC<UserCardProps> = ({ user }) => {
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return UI_MESSAGES.USER_STATUS.EMPTY_VALUE;
+    return new Date(dateString).toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long'
+    });
+  };
+
+  const formatDateWithYear = (dateString?: string | null) => {
+    if (!dateString) return UI_MESSAGES.USER_STATUS.EMPTY_VALUE;
+    return new Date(dateString).toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+
+  const calculateDaysAgo = (dateString?: string | null) => {
+    if (!dateString) return 0;
+    
+    const now = new Date();
+    const targetDate = new Date(dateString);
+    const diffTime = now.getTime() - targetDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    return Math.max(0, diffDays);
+  };
+
+  const calculateDaysLeft = (expiresAt?: string | null) => {
+    if (!expiresAt) return 0;
+    
+    const now = new Date();
+    const expiryDate = new Date(expiresAt);
+    const diffTime = expiryDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return Math.max(0, diffDays); // Не возвращаем отрицательные дни
+  };
+
+  const getSubscriptionText = () => {
+    if (!user.subscription_active) {
+      return 'неактивна';
+    }
+    
+    // Если подписка активна, показываем дату окончания
+    const endDate = formatDate(user.expires_at);
+    const daysLeft = calculateDaysLeft(user.expires_at);
+    
+    if (user.expires_at) {
+      return `до ${endDate} (${daysLeft} дней)`;
+    } else {
+      return `активна (${user.subscription_days_left || 0} дней)`;
+    }
+  };
+
+  // Рассчитываем реальное количество бесплатных дней
+  const getFreeDays = () => {
+    // Если есть активная подписка, бесплатных дней нет
+    if (user.subscription_active) {
+      return 0;
+    }
+    // Иначе показываем subscription_days_left как бесплатные дни
+    return user.subscription_days_left > 0 ? user.subscription_days_left : 0;
+  };
+
+  // Функция для определения стадии пользователя на основе доступных данных
+  const getUserStage = () => {
+    // 5. Нажал на кнопку у меня нет промокода и получил ссылку на оплаты
+    if (user.subscription_active || user.subscription_days_left > 0) {
+      return 'Получил ссылку на оплату';
+    }
+    
+    // 4. Нажал на промокод
+    if (user.promo_code) {
+      return 'Нажал на промокод';
+    }
+    
+    // 3. Увидел про цены (после выбора режима, но нет промокода и подписки)
+    if (user.mode && !user.promo_code && !user.subscription_active && user.subscription_days_left <= 0) {
+      return 'Увидел про цены';
+    }
+    
+    // 2. Выбрал режим тексты
+    if (user.mode) {
+      return 'Выбрал режим тексты';
+    }
+    
+    // 1. Просто нажал старт (только создан, ничего не настроено)
+    return 'Просто нажал старт';
+  };
+
+  // Определяем, какую дополнительную информацию показывать
+  const renderAdditionalInfo = () => {
+    // Для тех, кто вышел из чата (имеет joined_at но in_chat = false)
+    if (!user.in_chat && user.joined_at) {
+      const leftDate = formatDate(user.left_at);
+      const daysAgo = calculateDaysAgo(user.left_at);
+      
+      return (
+        <div className="flex justify-between">
+          <span className="text-gray-600">Дата выхода</span>
+          <span className="text-black font-medium">
+            {leftDate} ({daysAgo} дней назад)
+          </span>
+        </div>
+      );
+    }
+    
+    // Для тех, кто никогда не заходил в чат (joined_at = null)
+    if (!user.joined_at) {
+      const registrationDate = formatDateWithYear(user.created_at);
+      const daysAgo = calculateDaysAgo(user.created_at);
+      const stage = getUserStage();
+      
+      return (
+        <>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Начало общения</span>
+            <span className="text-black font-medium">
+              {registrationDate} ({daysAgo} дней назад)
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">Стадия</span>
+            <span className="text-black font-medium">{stage}</span>
+          </div>
+        </>
+      );
+    }
+    
+    return null;
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow p-4 mb-4 flex flex-col gap-2 border border-gray-100">
-      <div className="flex items-center gap-2 text-lg font-semibold">
-        <span>ID: {user.telegram_id}</span>
-        {user.username && <span className="text-gray-400">@{user.username}</span>}
+    <div className="border-b border-gray-100 py-6 last:border-b-0">
+      <div className="mb-4">
+        <h3 className="text-xl font-medium text-black">
+          {user.first_name} {user.last_name}
+          {user.username && (
+            <span className="text-gray-500 text-xs ml-2 font-normal">
+              @{user.username}
+            </span>
+          )}
+        </h3>
       </div>
-      <div className="text-sm text-gray-700">
-        <span>{user.first_name} {user.last_name}</span>
-      </div>
-      <div className="flex flex-wrap gap-2 text-xs mt-2">
-        <span className={user.in_chat ? 'text-green-600' : 'text-red-500'}>
-          {user.in_chat ? 'В чате' : 'Вне чата'}
-        </span>
-        {user.subscription_active && <span className="text-blue-600">Подписка активна</span>}
-        {user.club && <span className="text-purple-600">Клуб</span>}
-        {user.waitlist && <span className="text-yellow-600">Waitlist</span>}
-      </div>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-2">
-        <span>Дата регистрации: <b>{user.created_at ? new Date(user.created_at).toLocaleDateString() : '-'}</b></span>
-        <span>Дата входа: <b>{user.joined_at ? new Date(user.joined_at).toLocaleDateString() : '-'}</b></span>
-        <span>Дата выхода: <b>{user.left_at ? new Date(user.left_at).toLocaleDateString() : '-'}</b></span>
-        <span>Последняя активность: <b>{user.last_activity_at ? new Date(user.last_activity_at).toLocaleDateString() : '-'}</b></span>
-        <span>Режим: <b>{user.mode || '-'}</b></span>
-        <span>Ритм: <b>{user.pace || '-'}</b></span>
-        <span>Публичные напоминания: <b>{user.public_remind ? 'Да' : 'Нет'}</b></span>
-        <span>Промокод: <b>{user.promo_code || '-'}</b></span>
-        <span>Пауза: <b>{user.pause_started_at ? `${user.pause_days} дн. до ${user.pause_until ? new Date(user.pause_until).toLocaleDateString() : '-'}` : '-'}</b></span>
-        <span>Осталось дней подписки: <b>{user.subscription_days_left}</b></span>
-        <span>Дата окончания подписки: <b>{user.expires_at ? new Date(user.expires_at).toLocaleDateString() : '-'}</b></span>
-        <span>Страйки: <b>{user.strikes_count}</b></span>
-        <span>Пост сегодня: <b>{user.post_today ? 'Да' : 'Нет'}</b></span>
-        <span>Последний пост: <b>{user.last_post_date ? new Date(user.last_post_date).toLocaleDateString() : '-'}</b></span>
-        <span>Всего постов: <b>{user.units_count}</b></span>
-        <span>Позиция в waitlist: <b>{user.waitlist_position ?? '-'}</b></span>
+
+      <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+        {/* Показываем основные поля только для тех, кто заходил в чат */}
+        {user.joined_at && (
+          <>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Подписка</span>
+              <span className="text-black font-medium">{getSubscriptionText()}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-600">Пост сегодня</span>
+              <span className="text-black font-medium">
+                {user.post_today ? 'да' : 'нет'}
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-600">Бесплатных дней</span>
+              <span className="text-black font-medium">{getFreeDays()}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-600">Всего постов</span>
+              <span className="text-black font-medium">{user.units_count}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-600">Страйки</span>
+              <span className="text-black font-medium">{user.strikes_count}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-600">Ритм</span>
+              <span className="text-black font-medium">
+                {user.pace || UI_MESSAGES.USER_STATUS.EMPTY_VALUE}
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Дополнительная информация в зависимости от статуса пользователя */}
+        {renderAdditionalInfo()}
       </div>
     </div>
   );

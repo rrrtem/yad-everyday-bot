@@ -1,0 +1,12 @@
+{
+  "name": "yad-everyday",
+  "version": "1.0.0",
+  "scripts": {
+    "crm:dev": "cd CRM && npm run dev",
+    "crm:build": "cd CRM && npm run build", 
+    "crm:start": "cd CRM && npm run start",
+    "crm:lint": "cd CRM && npm run lint",
+    "crm:install": "cd CRM && npm install"
+  },
+  "devDependencies": {}
+} 

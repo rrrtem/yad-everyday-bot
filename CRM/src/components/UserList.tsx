@@ -1,6 +1,7 @@
 import React from 'react';
-import { User } from '../api/users';
 import { UserCard } from './UserCard';
+import { UI_MESSAGES } from '@/constants';
+import type { User } from '@/constants';
 
 interface UserListProps {
   users: User[];
@@ -8,10 +9,24 @@ interface UserListProps {
 }
 
 export const UserList: React.FC<UserListProps> = ({ users, loading }) => {
-  if (loading) return <div className="text-center py-8 text-gray-400">Загрузка...</div>;
-  if (!users.length) return <div className="text-center py-8 text-gray-400">Нет пользователей</div>;
+  if (loading) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        Загрузка...
+      </div>
+    );
+  }
+  
+  if (!users.length) {
+    return (
+      <div className="text-center py-16 text-gray-500">
+        {UI_MESSAGES.EMPTY_STATES.NO_USERS}
+      </div>
+    );
+  }
+  
   return (
-    <div className="flex flex-col gap-4">
+    <div>
       {users.map(user => (
         <UserCard key={user.telegram_id} user={user} />
       ))}
