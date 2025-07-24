@@ -13,6 +13,8 @@ export const SUPABASE_CONFIG = {
   SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY as string
 } as const;
 
+// Test auto deploy with correct Root Directory - 2025-07-24
+
 // ========== ФИЛЬТРЫ ПОЛЬЗОВАТЕЛЕЙ ==========
 export type UserFilter = 'in_chat' | 'out_chat' | 'never_in_chat' | 'search';
 
