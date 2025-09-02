@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendDirectMessage, findUserByTelegramId, registerUser, sendStatusMessageWithButtons } from "./userHandler.ts";
-import { MSG_START, MSG_GET_CHAT_ID, MSG_WELCOME_RETURNING, MSG_RESET_SUCCESS, isAdmin, MSG_CHAT_MEMBER_STATUS, MSG_CONTINUE_SETUP_HINT, MSG_ACTIVE_USER_STATUS_HINT, MSG_BROADCAST_CHAT_USAGE, MSG_BROADCAST_NOCHAT_USAGE, MSG_BROADCAST_STARTING_CHAT, MSG_BROADCAST_STARTING_NOCHAT, MSG_MASS_STATUS_STARTING, MSG_NO_USERS_IN_CHAT, MSG_NO_USERS_OUT_CHAT, MSG_BROADCAST_COMPLETED, MSG_MASS_STATUS_COMPLETED } from "./constants.ts";
+import { sendDirectMessage, sendPhotoWithCaption, findUserByTelegramId, registerUser, sendStatusMessageWithButtons } from "./userHandler.ts";
+import { MSG_START, MSG_GET_CHAT_ID, MSG_WELCOME_RETURNING, MSG_RESET_SUCCESS, isAdmin, MSG_CHAT_MEMBER_STATUS, MSG_CONTINUE_SETUP_HINT, MSG_ACTIVE_USER_STATUS_HINT, MSG_BROADCAST_CHAT_USAGE, MSG_BROADCAST_NOCHAT_USAGE, MSG_BROADCAST_STARTING_CHAT, MSG_BROADCAST_STARTING_NOCHAT, MSG_MASS_STATUS_STARTING, MSG_NO_USERS_IN_CHAT, MSG_NO_USERS_OUT_CHAT, MSG_BROADCAST_COMPLETED, MSG_BROADCAST_COMPLETED_DETAILED, MSG_MASS_STATUS_COMPLETED } from "./constants.ts";
 import { dailyCron, publicDeadlineReminder, allInfo } from "./cronHandler/index.ts";
 import { handleStartCommand } from "./startCommand/index.ts";
 import { handlePromoCode } from "./startCommand/states/index.ts";
@@ -214,7 +214,7 @@ export async function handleStatusCommand(message: any): Promise<void> {
  * Обрабатывает команды владельца бота
  */
 export async function handleOwnerCommands(message: any): Promise<void> {
-  const text = message.text || "";
+  const text = message.text || message.caption || "";
   const userId = message.from?.id;
   console.log(`🔧 Admin command: ${text} from user ${userId}`);
   
@@ -238,9 +238,6 @@ export async function handleOwnerCommands(message: any): Promise<void> {
         }
       } else {
         report += `ℹ️ ${data.message}`;
-      }
-      if (data.timeLeftMsg) {
-        report += `\n⏰ ${data.timeLeftMsg}`;
       }
     } catch {
       report += `❌ Ошибка выполнения. Код: ${res.status}`;
@@ -270,10 +267,12 @@ export async function handleOwnerCommands(message: any): Promise<void> {
     await handleCloseSlotsCommand(message.from.id);
   } else if (text === "/force_update_commands") {
     await handleForceUpdateCommandsCommand(message.from.id);
-  } else if (text.startsWith("/broadcast_chat ")) {
-    await handleBroadcastChatCommand(message.from.id, text);
-  } else if (text.startsWith("/broadcast_nochat ")) {
-    await handleBroadcastNoChatCommand(message.from.id, text);
+  } else if (text.startsWith("/broadcast_chat")) {
+    console.log(`🔧 Calling handleBroadcastChatCommand for user ${message.from.id}`);
+    await handleBroadcastChatCommand(message.from.id, text, message);
+  } else if (text.startsWith("/broadcast_nochat")) {
+    console.log(`🔧 Calling handleBroadcastNoChatCommand for user ${message.from.id}`);
+    await handleBroadcastNoChatCommand(message.from.id, text, message);
   } else if (text === "/mass_status") {
     await handleMassStatusCommand(message.from.id);
   }
@@ -877,13 +876,13 @@ async function handleForceUpdateCommandsCommand(telegramId: number): Promise<voi
  * Рассылка сообщения пользователям в чате (только для владельца)
  * Использование: /broadcast_chat Привет всем участникам!
  */
-async function handleBroadcastChatCommand(telegramId: number, text: string): Promise<void> {
+async function handleBroadcastChatCommand(telegramId: number, text: string, originalMessage: any): Promise<void> {
   console.log(`📡 BROADCAST_CHAT: Начало выполнения для админа ${telegramId}`);
   console.log(`📡 BROADCAST_CHAT: Исходный текст команды: "${text}"`);
   
   try {
-    // Извлекаем сообщение из команды
-    const message = text.replace("/broadcast_chat ", "").trim();
+    // Извлекаем сообщение из команды (убираем команду и любые пробелы/переносы в начале)
+    const message = text.replace(/^\/broadcast_chat\s*/, "").trim();
     console.log(`📡 BROADCAST_CHAT: Извлеченное сообщение: "${message}"`);
     
     if (!message) {
@@ -920,29 +919,45 @@ async function handleBroadcastChatCommand(telegramId: number, text: string): Pro
     
     let successCount = 0;
     let failCount = 0;
+    const successfulUsers: Array<{username: string, telegram_id: number}> = [];
+    const failedUsers: Array<{username: string, telegram_id: number}> = [];
     
     console.log(`📡 BROADCAST_CHAT: Начинаем рассылку ${users.length} пользователям`);
+    
+    // Проверяем, есть ли картинка в оригинальном сообщении
+    const hasPhoto = originalMessage.photo && originalMessage.photo.length > 0;
+    const photoFileId = hasPhoto ? originalMessage.photo[originalMessage.photo.length - 1].file_id : null;
+    
+    console.log(`📡 BROADCAST_CHAT: ${hasPhoto ? 'С картинкой' : 'Только текст'}, photoFileId: ${photoFileId}`);
     
     // Отправляем сообщения всем пользователям
     for (const user of users) {
       try {
-        console.log(`📡 BROADCAST_CHAT: Отправляем сообщение пользователю ${user.telegram_id} (@${user.username})`);
-        await sendDirectMessage(user.telegram_id, message);
+        console.log(`📡 BROADCAST_CHAT: Отправляем ${hasPhoto ? 'картинку с подписью' : 'сообщение'} пользователю ${user.telegram_id} (@${user.username})`);
+        
+        if (hasPhoto && photoFileId) {
+          await sendPhotoWithCaption(user.telegram_id, photoFileId, message);
+        } else {
+          await sendDirectMessage(user.telegram_id, message);
+        }
+        
         successCount++;
+        successfulUsers.push({username: user.username || '', telegram_id: user.telegram_id});
         console.log(`📡 BROADCAST_CHAT: ✅ Успешно отправлено пользователю ${user.telegram_id}`);
         
         // Небольшая задержка, чтобы не превысить лимиты Telegram
         await new Promise(resolve => setTimeout(resolve, 50));
       } catch (error) {
-        console.error(`📡 BROADCAST_CHAT: ❌ Ошибка отправки сообщения пользователю ${user.telegram_id}:`, error);
+        console.error(`📡 BROADCAST_CHAT: ❌ Ошибка отправки ${hasPhoto ? 'картинки' : 'сообщения'} пользователю ${user.telegram_id}:`, error);
         failCount++;
+        failedUsers.push({username: user.username || '', telegram_id: user.telegram_id});
       }
     }
     
     console.log(`📡 BROADCAST_CHAT: Рассылка завершена. Успешно: ${successCount}, Ошибок: ${failCount}`);
     
-    // Отчет админу
-    const report = MSG_BROADCAST_COMPLETED(users.length, successCount, failCount, message, true);
+    // Отчет админу с подробной информацией
+    const report = MSG_BROADCAST_COMPLETED_DETAILED(users.length, successCount, failCount, message, true, successfulUsers, failedUsers);
     await sendDirectMessage(telegramId, report);
     
   } catch (error) {
@@ -955,52 +970,89 @@ async function handleBroadcastChatCommand(telegramId: number, text: string): Pro
  * Рассылка сообщения пользователям НЕ в чате (только для владельца)
  * Использование: /broadcast_nochat Привет! Возвращайтесь к нам
  */
-async function handleBroadcastNoChatCommand(telegramId: number, text: string): Promise<void> {
+async function handleBroadcastNoChatCommand(telegramId: number, text: string, originalMessage: any): Promise<void> {
+  console.log(`📡 BROADCAST_NOCHAT: === ФУНКЦИЯ ВЫЗВАНА ===`);
+  console.log(`📡 BROADCAST_NOCHAT: Начало выполнения для админа ${telegramId}`);
+  console.log(`📡 BROADCAST_NOCHAT: Исходный текст команды: "${text}"`);
+  
   try {
-    // Извлекаем сообщение из команды
-    const message = text.replace("/broadcast_nochat ", "").trim();
+    // Извлекаем сообщение из команды (убираем команду и любые пробелы/переносы в начале)
+    const message = text.replace(/^\/broadcast_nochat\s*/, "").trim();
+    console.log(`📡 BROADCAST_NOCHAT: Извлеченное сообщение: "${message}"`);
     
     if (!message) {
+      console.log(`📡 BROADCAST_NOCHAT: Пустое сообщение, отправляем usage`);
       await sendDirectMessage(telegramId, MSG_BROADCAST_NOCHAT_USAGE);
       return;
     }
     
+    console.log(`📡 BROADCAST_NOCHAT: Отправляем уведомление о начале рассылки`);
     await sendDirectMessage(telegramId, MSG_BROADCAST_STARTING_NOCHAT);
     
     // Получаем пользователей НЕ в чате
+    console.log(`📡 BROADCAST_NOCHAT: Запрашиваем пользователей из БД с in_chat=false`);
     const { data: users, error } = await supabase
       .from("users")
       .select("telegram_id, username")
       .eq("in_chat", false);
     
     if (error) {
+      console.log(`📡 BROADCAST_NOCHAT: Ошибка запроса к БД:`, error);
       throw error;
     }
     
+    console.log(`📡 BROADCAST_NOCHAT: Получено пользователей из БД: ${users?.length || 0}`);
+    if (users && users.length > 0) {
+      console.log(`📡 BROADCAST_NOCHAT: Первые 3 пользователя:`, users.slice(0, 3));
+    }
+    
     if (!users || users.length === 0) {
+      console.log(`📡 BROADCAST_NOCHAT: Нет пользователей вне чата, отправляем уведомление`);
       await sendDirectMessage(telegramId, MSG_NO_USERS_OUT_CHAT);
       return;
     }
     
     let successCount = 0;
     let failCount = 0;
+    const successfulUsers: Array<{username: string, telegram_id: number}> = [];
+    const failedUsers: Array<{username: string, telegram_id: number}> = [];
+    
+    console.log(`📡 BROADCAST_NOCHAT: Начинаем рассылку ${users.length} пользователям`);
+    
+    // Проверяем, есть ли картинка в оригинальном сообщении
+    const hasPhoto = originalMessage.photo && originalMessage.photo.length > 0;
+    const photoFileId = hasPhoto ? originalMessage.photo[originalMessage.photo.length - 1].file_id : null;
+    
+    console.log(`📡 BROADCAST_NOCHAT: ${hasPhoto ? 'С картинкой' : 'Только текст'}, photoFileId: ${photoFileId}`);
     
     // Отправляем сообщения всем пользователям
     for (const user of users) {
       try {
-        await sendDirectMessage(user.telegram_id, message);
+        console.log(`📡 BROADCAST_NOCHAT: Отправляем ${hasPhoto ? 'картинку с подписью' : 'сообщение'} пользователю ${user.telegram_id} (@${user.username})`);
+        
+        if (hasPhoto && photoFileId) {
+          await sendPhotoWithCaption(user.telegram_id, photoFileId, message);
+        } else {
+          await sendDirectMessage(user.telegram_id, message);
+        }
+        
         successCount++;
+        successfulUsers.push({username: user.username || '', telegram_id: user.telegram_id});
+        console.log(`📡 BROADCAST_NOCHAT: ✅ Успешно отправлено пользователю ${user.telegram_id}`);
         
         // Небольшая задержка, чтобы не превысить лимиты Telegram
         await new Promise(resolve => setTimeout(resolve, 50));
       } catch (error) {
-        console.error(`Ошибка отправки сообщения пользователю ${user.telegram_id}:`, error);
+        console.error(`📡 BROADCAST_NOCHAT: ❌ Ошибка отправки ${hasPhoto ? 'картинки' : 'сообщения'} пользователю ${user.telegram_id}:`, error);
         failCount++;
+        failedUsers.push({username: user.username || '', telegram_id: user.telegram_id});
       }
     }
     
-    // Отчет админу
-    const report = MSG_BROADCAST_COMPLETED(users.length, successCount, failCount, message, false);
+    console.log(`📡 BROADCAST_NOCHAT: Рассылка завершена. Успешно: ${successCount}, Ошибок: ${failCount}`);
+    
+    // Отчет админу с подробной информацией
+    const report = MSG_BROADCAST_COMPLETED_DETAILED(users.length, successCount, failCount, message, false, successfulUsers, failedUsers);
     await sendDirectMessage(telegramId, report);
     
   } catch (error) {

@@ -380,12 +380,9 @@
 **Реализация:** PublicReminderFlow in cronHandler/flows/PublicReminderFlow.ts
 
 **Логика:**
-1. Вычисляет время до конца дня (04:00 UTC следующего дня)
-2. Фильтрует пользователей: in_chat = true, pace = "daily", НЕ на паузе, public_remind = true, НЕ прислали пост сегодня, username != null
-3. Обрабатывает пользователей с режимом: mode = "text"
-4. Отправляет в тред:
-   - PUBLIC_REMINDER_THREAD_ID_TEXT для всех пользователей
-5. Использует MSG_PUBLIC_DEADLINE_REMINDER с динамическим временем
+1. Фильтрует пользователей: in_chat = true, pace = "daily", НЕ на паузе, public_remind = true, НЕ прислали пост сегодня, username != null
+2. Создает сообщение с тегами всех подходящих пользователей: "@nickname1 @nickname2 @nickname3 Ждем ваш текст!"
+3. Отправляет в тред PUBLIC_REMINDER_THREAD_ID_TEXT
 
 ### Б4. allInfo - детальный отчёт для админа
 

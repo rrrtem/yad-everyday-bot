@@ -1,7 +1,6 @@
 import { ChatManager } from "./ChatManager.ts";
 import { ProcessingStats, User } from "./UserProcessor.ts";
 import { 
-  MSG_PUBLIC_DEADLINE_REMINDER,
   PUBLIC_REMINDER_THREAD_ID_TEXT
 } from "../../constants.ts";
 
@@ -12,57 +11,46 @@ export class ReportGenerator {
 
 
   /**
-   * Отправляет публичные напоминания пользователям (упрощённая версия)
+   * Отправляет публичные напоминания пользователям
    */
   static async sendPublicReminders(users: User[]): Promise<{sent: number, usernames: string[]}> {
     console.log(`📤 Отправляем публичное напоминание...`);
-    const text = 'Ждем ваш текст!';
+    
+    // Фильтруем пользователей для напоминания
+    const now = new Date();
+    const usersToRemind = users.filter(user => 
+      user.in_chat && 
+      user.pace === "daily" && 
+      user.public_remind !== false && // по умолчанию true
+      !user.post_today && // не прислали пост сегодня
+      user.username && // есть username для тега
+      (!user.pause_until || new Date(user.pause_until) <= now) // не на паузе
+    );
+    
+    console.log(`📊 Найдено ${usersToRemind.length} пользователей для напоминания`);
+    
+    if (usersToRemind.length === 0) {
+      console.log(`ℹ️ Нет пользователей для напоминания`);
+      return { sent: 0, usernames: [] };
+    }
+    
+    // Создаем сообщение с тегами
+    const usernames = usersToRemind.map(user => user.username!);
+    const text = `${usernames.map(u => '@' + u).join(' ')} Ждем ваш текст!`;
+    
+    console.log(`💬 Отправляем: "${text}"`);
+    
     const success = await ChatManager.sendGroupMessage(text, PUBLIC_REMINDER_THREAD_ID_TEXT);
     if (success) {
-      console.log(`✅ Напоминание отправлено`);
-      return { sent: 1, usernames: [] };
+      console.log(`✅ Напоминание отправлено для ${usernames.length} пользователей`);
+      return { sent: 1, usernames };
     } else {
       console.log(`❌ Ошибка отправки напоминания`);
       return { sent: 0, usernames: [] };
     }
   }
 
-  /**
-   * Вычисление времени до конца дня
-   */
-  static calculateTimeUntilEndOfDay(now: Date): {diffHours: number, diffMinutes: number, timeLeftMsg: string} {
-    // Конец дня — 04:00 следующего дня по UTC (время запуска dailyCron)
-    const endOfDay = new Date(now);
-    endOfDay.setUTCHours(4, 0, 0, 0);
-    
-    // Если текущее время уже после 04:00, то конец дня — завтра в 04:00
-    if (now.getUTCHours() >= 4) {
-      endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
-    }
-    
-    const diffMs = endOfDay.getTime() - now.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
 
-    let timeLeftMsg = "";
-    if (diffHours > 0) {
-      timeLeftMsg = `Ждем ваш текст!`;
-    } else {
-      timeLeftMsg = `До конца дня осталось меньше часа! (${diffMinutes} минут)`;
-    }
-
-    return { diffHours, diffMinutes, timeLeftMsg };
-  }
-
-  /**
-   * Склонение слова "час"
-   */
-  private static pluralizeHours(n: number): string {
-    const abs = Math.abs(n);
-    if (abs === 1) return 'час';
-    if (abs >= 2 && abs <= 4) return 'часа';
-    return 'часов';
-  }
 
   /**
    * Вывод финальной статистики в консоль

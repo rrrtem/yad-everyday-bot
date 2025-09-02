@@ -66,19 +66,19 @@ export const MODE_PACE_CONFIG = {
 };
 
 // Валидные промокоды (позже можно вынести в БД)
-export const VALID_PROMO_CODES = ["YASSS", "FREE10", "TRY", "TEN", "DOYOUKNOWWHOIAM"];
+export const VALID_PROMO_CODES = ["YASSS", "FREE", "TRY", "TEN", "DOYOUKNOWWHOIAM"];
 
 // Типы промокодов
 export const PROMO_TYPES = {
   CLUB_DISCOUNT: "YASSS",    // Дает скидку для участников клуба
-  FREE_DAYS: "FREE10",        // Дает бесплатные дни
+  FREE_DAYS: "FREE",        // Дает бесплатные дни
   TRY_DAYS: "TRY",             // Пробный промокод на 3 дня
   TEN_DAYS: "TEN",             // Промокод на 10 дней
   HUNDRED_DAYS: "DOYOUKNOWWHOIAM" // Промокод на 100 дней
 };
 
 // Количество бесплатных дней для промокодов
-export const FREE_PROMO_DAYS = 10;
+export const FREE_PROMO_DAYS = 30;
 export const TRY_PROMO_DAYS = 3;
 export const TEN_PROMO_DAYS = 10;
 export const HUNDRED_PROMO_DAYS = 1000;
@@ -175,12 +175,20 @@ export const MSG_SLOTS_CLOSED = `🔒 Все слоты закрыты!
 export const MSG_BROADCAST_CHAT_USAGE = `❌ Укажите сообщение для рассылки.
 
 Использование:
-/broadcast_chat Ваше сообщение`;
+/broadcast_chat Ваше сообщение
+
+Можно отправлять с переносами строк, форматированием и картинками.
+
+После завершения вы получите подробный отчет с именами пользователей.`;
 
 export const MSG_BROADCAST_NOCHAT_USAGE = `❌ Укажите сообщение для рассылки.
 
 Использование:
-/broadcast_nochat Ваше сообщение`;
+/broadcast_nochat Ваше сообщение
+
+Можно отправлять с переносами строк, форматированием и картинками.
+
+После завершения вы получите подробный отчет с именами пользователей.`;
 
 export const MSG_BROADCAST_STARTING_CHAT = "📡 Начинаю рассылку пользователям в чате...";
 export const MSG_BROADCAST_STARTING_NOCHAT = "📡 Начинаю рассылку пользователям НЕ в чате...";
@@ -196,6 +204,44 @@ export const MSG_BROADCAST_COMPLETED = (totalUsers: number, successCount: number
   if (failCount > 0) {
     report += `❌ Ошибок отправки: ${failCount}\n`;
   }
+  report += `\n📝 Отправленное сообщение:\n"${message}"`;
+  return report;
+};
+
+export const MSG_BROADCAST_COMPLETED_DETAILED = (
+  totalUsers: number, 
+  successCount: number, 
+  failCount: number, 
+  message: string, 
+  isInChat: boolean,
+  successfulUsers: Array<{username: string, telegram_id: number}>,
+  failedUsers: Array<{username: string, telegram_id: number}>
+) => {
+  let report = `✅ Рассылка завершена!\n\n`;
+  report += `👥 Всего пользователей ${isInChat ? 'в чате' : 'вне чата'}: ${totalUsers}\n`;
+  report += `✅ Успешно отправлено: ${successCount}\n`;
+  if (failCount > 0) {
+    report += `❌ Ошибок отправки: ${failCount}\n`;
+  }
+  
+  // Добавляем список успешно отправленных
+  if (successfulUsers.length > 0) {
+    report += `\n✅ Успешно отправлено:\n`;
+    successfulUsers.forEach((user, index) => {
+      const username = user.username ? `@${user.username}` : `ID:${user.telegram_id}`;
+      report += `${index + 1}. ${username}\n`;
+    });
+  }
+  
+  // Добавляем список неудачных отправок
+  if (failedUsers.length > 0) {
+    report += `\n❌ Не удалось отправить:\n`;
+    failedUsers.forEach((user, index) => {
+      const username = user.username ? `@${user.username}` : `ID:${user.telegram_id}`;
+      report += `${index + 1}. ${username}\n`;
+    });
+  }
+  
   report += `\n📝 Отправленное сообщение:\n"${message}"`;
   return report;
 };
@@ -461,8 +507,7 @@ export const MSG_CHANGE_PACE_NOT_ACTIVE = `❌ Команда доступна �
 // СООБЩЕНИЯ: АВТОМАТИЧЕСКИЕ НАПОМИНАНИЯ И ШТРАФЫ
 // =====================================================
 
-// Сообщение для публичного напоминания в канал с динамическим временем до конца дня
-export const MSG_PUBLIC_DEADLINE_REMINDER = (usernames: string[], timeLeftMsg: string) => `${usernames.map(u => '@' + u).join(', ')} ${timeLeftMsg}`;
+
 
 // =====================================================
 // СООБЩЕНИЯ: СЛУЖЕБНЫЕ И УТИЛИТЫ

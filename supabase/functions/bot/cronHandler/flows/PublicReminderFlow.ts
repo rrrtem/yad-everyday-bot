@@ -30,20 +30,10 @@ export class PublicReminderFlow {
     console.log(`🔔 Public reminder started at ${now.toISOString()}`);
     
     try {
-      // Вычисляем время до конца дня
-      // const { diffHours, diffMinutes, timeLeftMsg } = ReportGenerator.calculateTimeUntilEndOfDay(now);
-      // console.log(`⏰ До конца дня (04:00 UTC): ${diffHours}ч ${diffMinutes}мин`);
-
       // Получаем пользователей, которым нужно напомнить
-      // console.log(`📊 Получаем данные пользователей из БД...`);
       const users = await this.getUsersForReminder();
       console.log(`📊 Loaded ${users.length} user records`);
       
-      // Диагностика пользователей
-      // this.logUserDiagnostics(users);
-      
-      // console.log(`💬 Текст напоминания: "${timeLeftMsg}"`);
-
       // Отправляем напоминания
       const { sent: sentReminders, usernames: allUsernames } = await ReportGenerator.sendPublicReminders(users);
 
@@ -51,15 +41,9 @@ export class PublicReminderFlow {
       const endTime = Date.now();
       const executionTime = endTime - startTime;
       
-      // console.log(`\n=== PUBLIC REMINDER COMPLETED ===`);
-      // console.log(`⏱️ Время выполнения: ${executionTime}ms`);
-      // console.log(`📊 Результат: отправлено ${sentReminders} напоминаний в ${sentReminders} тредов`);
-      // console.log(`👥 Всего пользователей в напоминаниях: ${allUsernames.length}`);
-      // console.log(`🏁 Public reminder завершен в ${new Date().toISOString()}`);
       console.log(`✅ Public reminder completed: ${sentReminders} threads, ${allUsernames.length} users in ${executionTime}ms`);
 
       if (sentReminders === 0) {
-        // console.log(`ℹ️ Все участники уже прислали посты или не требуют напоминаний`);
         return new Response(JSON.stringify({ 
           message: "Все участники уже прислали посты или не требуют напоминаний",
           executionTime 
@@ -69,7 +53,6 @@ export class PublicReminderFlow {
       return new Response(JSON.stringify({ 
         message: "Публичные напоминания отправлены", 
         usernames: allUsernames, 
-        timeLeftMsg,
         sentToThreads: sentReminders,
         executionTime
       }), { status: 200 });
@@ -95,26 +78,5 @@ export class PublicReminderFlow {
     return usersRes.data || [];
   }
 
-  /**
-   * Диагностика пользователей
-   */
-  private logUserDiagnostics(users: User[]): void {
-    const activeDailyUsers = users.filter(u => u.in_chat && u.pace === "daily");
-    // console.log(`🔍 Активных пользователей с pace="daily": ${activeDailyUsers.length}`);
-    
-    // if (activeDailyUsers.length > 0) {
-    //   console.log(`   📋 Список: ${activeDailyUsers.map(u => `${u.username}(${u.pace})`).join(', ')}`);
-    // }
-    
-    // Детальная диагностика фильтрации
-    // console.log(`\n🔎 ДЕТАЛЬНАЯ ДИАГНОСТИКА:`);
-    // for (const user of activeDailyUsers.slice(0, 5)) { // Показываем первых 5 для примера
-    //   console.log(`👤 ${user.username}:`);
-    //   console.log(`   - mode: "${user.mode}" (trimmed: "${user.mode?.trim()}")`);
-    //   console.log(`   - post_today: ${user.post_today}`);
-    //   console.log(`   - public_remind: ${user.public_remind}`);
-    //   console.log(`   - pause_until: ${user.pause_until}`);
-    //   console.log(`   - username: ${user.username ? 'есть' : 'НЕТ'}`);
-    // }
-  }
+
 } 

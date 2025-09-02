@@ -3,7 +3,7 @@
 Телеграм-бот для проекта "Ясность&Движение / Каждый день" - челлендж с платной подпиской через Tribute.
 
 ## Структура проекта
-
+supabase && npx supabase functions deploy bot --project-ref bqtgrzauzqlodgipaisz
 ```
 supabase/
   functions/

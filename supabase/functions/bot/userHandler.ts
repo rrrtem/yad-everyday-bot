@@ -43,6 +43,35 @@ export async function sendDirectMessage(telegramId: number, text: string): Promi
 }
 
 /**
+ * Отправляет картинку с подписью пользователю
+ */
+export async function sendPhotoWithCaption(telegramId: number, photoFileId: string, caption: string): Promise<number | null> {
+  try {
+    const response = await fetch(`${TELEGRAM_API}/sendPhoto`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        chat_id: telegramId, 
+        photo: photoFileId,
+        caption,
+        parse_mode: "HTML"
+      }),
+    });
+    const respJson = await response.json();
+    if (!respJson.ok) {
+      console.error(`Error sending photo to ${telegramId}: ${respJson.description}`);
+      return null;
+    } else {
+      console.log(`Photo sent to ${telegramId} with caption: "${caption}"`);
+      return respJson.result?.message_id || null;
+    }
+  } catch (error) {
+    console.error(`Failed to send photo to ${telegramId}:`, error);
+    return null;
+  }
+}
+
+/**
  * Удаляет сообщение пользователя
  */
 export async function deleteMessage(telegramId: number, messageId: number): Promise<boolean> {

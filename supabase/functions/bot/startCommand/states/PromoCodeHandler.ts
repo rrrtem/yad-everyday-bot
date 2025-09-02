@@ -11,6 +11,7 @@ import {
   CALLBACK_RESET,
   BUTTON_TEXT_RESET
 } from "../../constants.ts";
+import { setWaitingPromoState, clearUserState } from "../../commandHandler.ts";
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;

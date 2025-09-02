@@ -285,7 +285,13 @@ Deno.serve(async (req) => {
           }
       } else if (/\B#daily\b/i.test(text)) {
         await handleDailyPost(message);
-      } else if (chatType === "private" && isAdmin(message.from.id) && (["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions", "/slots", "/test_slots", "/close_slots", "/force_update_commands", "/mass_status"].includes(text) || text.startsWith("/test_webhook ") || text.startsWith("/open") || text.startsWith("/broadcast_chat ") || text.startsWith("/broadcast_nochat "))) {
+      } else if (chatType === "private" && isAdmin(message.from.id) && (
+        ["/daily", "/remind", "/allinfo", "/tribute_test", "/sync_subscriptions", "/slots", "/test_slots", "/close_slots", "/force_update_commands", "/mass_status"].includes(text) || 
+        text.startsWith("/test_webhook ") || 
+        text.startsWith("/open") || 
+        text.startsWith("/broadcast_chat") || 
+        text.startsWith("/broadcast_nochat")
+      )) {
         console.log(`🔑 ADMIN COMMAND DETECTED: "${text}" from user ${message.from.id}`);
         await handleOwnerCommands(message);
             } else if (chatType === "private" && text && !text.startsWith("/")) {
