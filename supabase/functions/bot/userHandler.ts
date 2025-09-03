@@ -98,6 +98,44 @@ export async function sendMediaGroup(telegramId: number, media: Array<{ type: st
 }
 
 /**
+ * Отправляет нативный видео-кружок (video note)
+ * video может быть file_id (уже загруженный в Telegram) или HTTPS URL
+ * Доп. опции: duration (секунды), length (ширина/высота, для кружка должно быть квадратное видео)
+ */
+export async function sendVideoNote(
+  telegramId: number,
+  video: string,
+  options?: { duration?: number; length?: number; disable_notification?: boolean; protect_content?: boolean }
+): Promise<number | null> {
+  try {
+    const body: any = {
+      chat_id: telegramId,
+      video_note: video
+    };
+    if (options?.duration !== undefined) body.duration = options.duration;
+    if (options?.length !== undefined) body.length = options.length;
+    if (options?.disable_notification !== undefined) body.disable_notification = options.disable_notification;
+    if (options?.protect_content !== undefined) body.protect_content = options.protect_content;
+
+    const response = await fetch(`${TELEGRAM_API}/sendVideoNote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    const respJson = await response.json();
+    if (!respJson.ok) {
+      console.error(`Error sending video note to ${telegramId}: ${respJson.description}`);
+      return null;
+    }
+    return respJson.result?.message_id || null;
+  } catch (error) {
+    console.error(`Failed to send video note to ${telegramId}:`, error);
+    return null;
+  }
+}
+
+/**
  * Удаляет сообщение пользователя
  */
 export async function deleteMessage(telegramId: number, messageId: number): Promise<boolean> {

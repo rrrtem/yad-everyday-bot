@@ -1,7 +1,7 @@
 import { UserContext } from "../UserAnalyzer.ts";
 import { sendDirectMessage } from "../../userHandler.ts";
 import { OnboardingScenario } from "../../onboarding/OnboardingScenario.ts";
-import { MSG_WELCOME, MSG_NEW_USER_AUTO_START } from "../../constants.ts";
+import {  } from "../../constants.ts";
 import { WaitlistFlow } from "./WaitlistFlow.ts";
 import { registerUser } from "../../userHandler.ts";
 
@@ -11,17 +11,7 @@ import { registerUser } from "../../userHandler.ts";
 export class NewUserFlow {
   
   static async handle(context: UserContext): Promise<void> {
-    const { telegramId, autoTriggered, originalMessage } = context;
-    
-    if (autoTriggered && originalMessage) {
-      // console.log(`NewUserFlow: Пользователь ${telegramId} написал "${originalMessage}" - автозапуск /start`);
-      
-      // Отправляем сообщение о автозапуске перед приветствием
-      await sendDirectMessage(telegramId, MSG_NEW_USER_AUTO_START);
-    } else {
-      // Отправляем обычное приветствие для новых пользователей
-      await sendDirectMessage(telegramId, MSG_WELCOME);
-    }
+    const { telegramId } = context;
 
     // Проверяем и создаем пользователя
     await registerUser(context.telegramUserData);

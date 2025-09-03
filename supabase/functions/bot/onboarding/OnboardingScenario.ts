@@ -1,4 +1,4 @@
-import { sendDirectMessage, sendMediaGroup, findUserByTelegramId } from "../userHandler.ts";
+import { sendDirectMessage, sendMediaGroup, findUserByTelegramId, sendPhotoWithCaption } from "../userHandler.ts";
 import { setWaitingPromoState, clearUserState } from "../commandHandler.ts";
 import { CHALLENGE_JOIN_LINK, DEFAULT_PAYMENT_URL, SPECIAL_PAYMENT_URL } from "../constants.ts";
 
@@ -26,11 +26,11 @@ async function sendMessageWithButtons(telegramId: number, text: string, keyboard
   }
 }
 
-// Рыба-URL картинок альбома (замените на валидные URL по необходимости)
+// Публичные URL картинок альбома
 const ONB_IMAGES = [
-  "R1.jpg",
-  "R2.jpg",
-  "R3.jpg"
+  "https://raw.githubusercontent.com/rrrtem/yad-everyday-bot/refs/heads/main/CRM/public/n1.jpg",
+  "https://raw.githubusercontent.com/rrrtem/yad-everyday-bot/refs/heads/main/CRM/public/n2.jpg",
+  "https://raw.githubusercontent.com/rrrtem/yad-everyday-bot/refs/heads/main/CRM/public/n3.jpg"
 ];
 
 export class OnboardingScenario {
@@ -39,7 +39,14 @@ export class OnboardingScenario {
   }
 
   private static async showBlock1(telegramId: number): Promise<void> {
-    const m1 = "Привет! Я бот практики «Каждый день» от сообщества «Ясность&Движение».";
+    // Обложка перед первым сообщением
+    await sendPhotoWithCaption(
+      telegramId,
+      "https://raw.githubusercontent.com/rrrtem/yad-everyday-bot/refs/heads/main/CRM/public/cover.jpg",
+      ""
+    );
+    await delay(300);
+    const m1 = "Привет! Я бот практики «Каждый день» от сообщества <a href=\"https://www.instagram.com/clarity.and.movement/\">«Ясность&Движение»</a>. По любым вопросам, пишите Артему — @rrrtem.";
     const m2 = "Если каждый день делать какое-то дело, обязательно произойдёт что-то классное. Чтобы поддержать нас всех в этом процессе, мы придумали практику, которая помогает выстроить творческую рутину.";
     const m3 = "Пока у нас доступно одно направление — мы пишем тексты. Эссе, наблюдения за собой или миром, дневники, посты, анонсы, сценарии к рилсами и любые другие жанры.";
     const m4 = "Практика открыта для всех. Совершенно не обязательно быть писателем, чтобы писать тексты, ждём с любым уровнем. А еще вы продвигаем подход без невроза и верм, что важнее уметь возвращаться, а не стремиться к недостижимому идеалу.";
@@ -51,12 +58,18 @@ export class OnboardingScenario {
     await sendDirectMessage(telegramId, m3);
     await delay(450);
     await sendMessageWithButtons(telegramId, m4, {
-      inline_keyboard: [[{ text: "ДАЛЬШЕ", callback_data: "onb_next_1" }]]
+      inline_keyboard: [[{ text: "Дальше", callback_data: "onb_next_1" }]]
     });
   }
 
   private static async showBlock2(telegramId: number): Promise<void> {
-    // Альбом из 3 фото (если URL невалидны, отправим текст-заглушку)
+    const m2 = "Кроме этого каждый месяц зовём классного гостя, который делает практику со всеми\nи делится своим опытом.";
+    const m3 = "Ближайший гость — <a href=\"https://www.instagram.com/p/DOG3T2vgi3R/?img_index=1\">Наташа Подлыжняк</a>. Писательница, основательница школы текстов «Мне есть что сказать», хозяйка ирландской терьерки Пеппер. С 7 по 21 сентября Наташа будет писать наблюдения за жизнью и работать над романом про женскую дружбу. А еще делиться своими лайфхаками про творческий процесс.";
+    await sendDirectMessage(telegramId, m2);
+    await delay(450);
+    await sendDirectMessage(telegramId, m3);
+
+    // Альбом из 3 фото (после текста). Если URL невалидны, отправим текст-заглушку
     const looksValid = ONB_IMAGES.every(u => typeof u === "string" && (u.startsWith("http://") || u.startsWith("https://")));
     if (looksValid) {
       const media = ONB_IMAGES.map(url => ({ type: "photo", media: url }));
@@ -65,12 +78,9 @@ export class OnboardingScenario {
       await sendDirectMessage(telegramId, "[Альбом с фото будет здесь]");
     }
 
-    const m2 = "Кроме этого каждый месяц зовём классного гостя, который делает практику со всеми\nи делится своим опытом";
-    const m3 = "Ближайший гость — Наташа Подлыжняк. Писательница, основательница школы текстов «Мне есть что сказать», хозяйка ирландской терьерки Пеппер. С 7 по 21 сентября Наташа будет писать наблюдения за жизнью и работать над романом про женскую дружбу. А еще делиться своими лайфхаками про творческий процесс.";
-    await sendDirectMessage(telegramId, m2);
-    await delay(450);
-    await sendMessageWithButtons(telegramId, m3, {
-      inline_keyboard: [[{ text: "К ОПЛАТЕ", callback_data: "onb_to_payment" }]]
+    // Кнопка после картинок
+    await sendMessageWithButtons(telegramId, "Подробнее об оплате:", {
+      inline_keyboard: [[{ text: "узнать про оплату", callback_data: "onb_to_payment" }]]
     });
   }
 
@@ -79,10 +89,10 @@ export class OnboardingScenario {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "НЕТ ПРОМОКОДА", callback_data: "onb_no_promo" }
+          { text: "Нет промокода", callback_data: "onb_no_promo" }
         ],
         [
-          { text: "НАЧАТЬ ЗАНОВО", callback_data: "onb_restart" }
+          { text: "Начать заново", callback_data: "onb_restart" }
         ]
       ]
     };
@@ -100,7 +110,7 @@ export class OnboardingScenario {
     } else if (isClub) {
       header = "Супер, теперь про оплату. Для участников сообщества «Ясность&Движентие». Участие в практие стоит ₽2900 за месяц.";
     } else {
-      header = "Супер, теперь про оплату. Участие в практие стоит ₽4900 за месяц. Пробная неделя — ₽900.";
+      header = "Супер, теперь про оплату. Участие в практие стоит ₽4900 за месяц. Пробная неделя — ₽745.";
     }
 
     const note = "Мы хотим чтобы практика приносила пользу. Поэтому когда вы выходите из чата и отменяете подписку, мы сохраняем все оставшиеся оплаченные дни и даём возможность использовать их в будущем.";
@@ -110,14 +120,14 @@ export class OnboardingScenario {
 
     const keyboardRows: any[] = [];
     if (hasFreeDays) {
-      keyboardRows.push([{ text: "ВОЙТИ В ЧАТ", url: CHALLENGE_JOIN_LINK }]);
-      keyboardRows.push([{ text: "ВВЕСТИ ПРОМОКОД", callback_data: "onb_enter_promo" }]);
+      keyboardRows.push([{ text: "Войти в чат", url: CHALLENGE_JOIN_LINK }]);
+      keyboardRows.push([{ text: "Ввести промокод", callback_data: "onb_enter_promo" }]);
       // Без кнопки НАЧАТЬ ЗАНОВО, если есть ВОЙТИ В ЧАТ
     } else {
       const payUrl = isClub ? SPECIAL_PAYMENT_URL : DEFAULT_PAYMENT_URL;
-      keyboardRows.push([{ text: "ОПЛАТИТЬ УЧАСТИЕ", url: payUrl }]);
-      keyboardRows.push([{ text: "ВВЕСТИ ПРОМОКОД", callback_data: "onb_enter_promo" }]);
-      keyboardRows.push([{ text: "НАЧАТЬ ЗАНОВО", callback_data: "onb_restart" }]);
+      keyboardRows.push([{ text: "Оплатить участие", url: payUrl }]);
+      keyboardRows.push([{ text: "Ввести промокод", callback_data: "onb_enter_promo" }]);
+      keyboardRows.push([{ text: "Начать заново", callback_data: "onb_restart" }]);
     }
 
     await sendMessageWithButtons(telegramId, note, { inline_keyboard: keyboardRows });
