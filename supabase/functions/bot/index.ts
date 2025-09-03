@@ -11,6 +11,7 @@ import { handlePauseCommand, handleUnpauseCommand } from "./pauseHandler.ts";
 import { handleChangeModeCallback } from "./changeModeHandler.ts";
 import { handleChangePaceCommand, handleChangePaceCallback } from "./changePaceHandler.ts";
 import { handleStartCallbackQuery } from "./startCommand/index.ts";
+import { OnboardingScenario } from "./onboarding/OnboardingScenario.ts";
 import { dailyCron, publicDeadlineReminder } from "./cronHandler/index.ts";
 import { handleNewChatMember } from "./newChatMemberHandler.ts";
 import { handleLeftChatMember } from "./leftChatMemberHandler.ts";
@@ -332,6 +333,8 @@ Deno.serve(async (req) => {
         await handleChooseModeCallbackQuery(update.callback_query);
       } else if (update.callback_query.data === "choose_pace") {
         await handleChoosePaceCallbackQuery(update.callback_query);
+      } else if (update.callback_query.data && update.callback_query.data.startsWith("onb_")) {
+        await OnboardingScenario.handleCallback(update.callback_query);
       } else {
         // Обрабатываем остальные callback query через стандартный обработчик
         await handleStartCallbackQuery(update.callback_query);

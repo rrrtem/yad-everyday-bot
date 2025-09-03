@@ -72,6 +72,32 @@ export async function sendPhotoWithCaption(telegramId: number, photoFileId: stri
 }
 
 /**
+ * Отправляет медиагруппу (альбом) пользователю
+ * media: [{ type: 'photo', media: 'https://...' }, ...]
+ */
+export async function sendMediaGroup(telegramId: number, media: Array<{ type: string; media: string; caption?: string }>): Promise<boolean> {
+  try {
+    const response = await fetch(`${TELEGRAM_API}/sendMediaGroup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: telegramId,
+        media
+      })
+    });
+    const respJson = await response.json();
+    if (!respJson.ok) {
+      console.error(`Error sendMediaGroup to ${telegramId}: ${respJson.description}`);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error(`Failed to sendMediaGroup to ${telegramId}:`, error);
+    return false;
+  }
+}
+
+/**
  * Удаляет сообщение пользователя
  */
 export async function deleteMessage(telegramId: number, messageId: number): Promise<boolean> {

@@ -140,19 +140,19 @@
 2. **Автоматическая проверка клубного статуса** — по username через club.json
 3. **Маршрутизация по Flow** в зависимости от типа пользователя:
 
-**Flow NewUserFlow:**
-1. Отправляет MSG_WELCOME
+**Flow NewUserFlow (обновлено):**
+1. Отправляет приветственное сообщение (как было)
 2. Проверяет доступные слоты через SlotManager.hasAvailableSlots()
 3. Если слотов нет → WaitlistFlow.handle()
-4. Если есть → SetupProcess.startModeSelection()
+4. Если есть → запускает единый сценарий анбординга `OnboardingScenario.runOnboarding(telegramId)`
 
 **Flow ActiveUserFlow:**
 - Отправляет MSG_WELCOME_ALREADY_ACTIVE и завершается
 
-**Flow ReturningUserFlow:**
-1. Проверяет сохранённые дни (hasSavedDays)
-2. Если есть → отправляет MSG_WELCOME_RETURNING + PaymentHandler.sendDirectChatLinkWithButton()
-3. Если нет → проверяет слоты и запускает настройку или waitlist
+**Flow ReturningUserFlow (обновлено):**
+1. Отправляет MSG_WELCOME_RETURNING(hasSavedDays, daysLeft)
+2. Если пользователь не в чате → запускает `OnboardingScenario.runOnboarding(telegramId)`
+3. Иначе — без изменений
 
 **Flow ContinueSetupFlow:**
 - Продолжает с состояния user_state (waiting_mode, waiting_promo, payment_link_sent)
@@ -162,12 +162,33 @@
 2. Устанавливает user_state = "in_waitlist"
 3. Отправляет MSG_WAITLIST с позицией в очереди
 
-### Упрощения в стартовом сценарии
+### Упрощения в стартовом сценарии (актуально)
 
 1. **Убран выбор ритма** — автоматически назначается `daily` для всех режимов (в ModeSelectionHandler)
 2. **Система слотов** — ограничение доступа через waitlist при заполнении мест
 3. **Автопроверка клуба** — статус определяется по username из club.json
-4. **Упрощенный флоу** — режим → промокод → оплата (без промежуточного выбора ритма)
+4. **Упрощенный флоу** — единый сценарий анбординга в одном файле: Блок1 → Блок2 (альбом + инфо) → Блок3 (промокод) → Блок4 (оплата/вход в чат)
+
+### Сценарий анбординга (OnboardingScenario)
+Файл: `supabase/functions/bot/onboarding/OnboardingScenario.ts`
+
+Порядок шагов и эталонные callback-ключи:
+- Блок 1 (4 сообщения с паузами). Кнопка: `onb_next_1`
+- Блок 2 (альбом из 3 фото; тексты 2–3). Кнопка: `onb_to_payment`
+- Блок 3 (текст про промокод). Кнопки: `onb_no_promo`, `onb_restart`
+- Блок 4 (ветки оплаты/входа в чат):
+  - Если есть бесплатные дни → кнопки: `ВОЙТИ В ЧАТ (url)`, `onb_enter_promo`
+  - Иначе → кнопки: `ОПЛАТИТЬ УЧАСТИЕ (url по клубу/неклубу)`, `onb_enter_promo`, `onb_restart`
+
+Обработка callback-ов добавлена в `index.ts` (ветка startsWith("onb_")) и делегируется в `OnboardingScenario.handleCallback`.
+
+Эталонные переменные/ключи:
+- Ссылки (CHALLENGE_JOIN_LINK, DEFAULT_PAYMENT_URL, SPECIAL_PAYMENT_URL) — в `constants.ts`
+- Callback-и анбординга: `onb_next_1`, `onb_to_payment`, `onb_no_promo`, `onb_enter_promo`, `onb_restart`
+
+Медиа:
+- `sendMediaGroup` добавлен в `userHandler.ts`
+- Временные рыба-URL: `R1.jpg`, `R2.jpg`, `R3.jpg` (заменить на реальные публичные URL)
 
 ### A2. /comeback
 

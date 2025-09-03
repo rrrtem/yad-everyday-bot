@@ -1,6 +1,6 @@
 import { UserContext } from "../UserAnalyzer.ts";
 import { sendDirectMessage } from "../../userHandler.ts";
-import { SetupProcess } from "../states/SetupProcess.ts";
+import { OnboardingScenario } from "../../onboarding/OnboardingScenario.ts";
 import { MSG_WELCOME, MSG_NEW_USER_AUTO_START } from "../../constants.ts";
 import { WaitlistFlow } from "./WaitlistFlow.ts";
 import { registerUser } from "../../userHandler.ts";
@@ -46,8 +46,8 @@ export class NewUserFlow {
       // console.log(`NewUserFlow: Добавляем пользователя ${telegramId} в waitlist`);
       await WaitlistFlow.handle(context);
     } else {
-      // console.log(`NewUserFlow: Есть свободные места, запускаем настройку для пользователя ${telegramId}`);
-      await SetupProcess.startModeSelection(telegramId);
+      // console.log(`NewUserFlow: Есть свободные места, запускаем новый сценарий онбординга для пользователя ${telegramId}`);
+      await OnboardingScenario.runOnboarding(telegramId);
     }
   }
 } 
