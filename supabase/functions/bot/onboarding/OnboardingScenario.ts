@@ -67,9 +67,8 @@ export class OnboardingScenario {
     const m3 = "Ближайший гость — <a href=\"https://www.instagram.com/p/DOG3T2vgi3R/?img_index=1\">Наташа Подлыжняк</a>. Писательница, основательница школы текстов «Мне есть что сказать», хозяйка ирландской терьерки Пеппер. С 7 по 21 сентября Наташа будет писать наблюдения за жизнью и работать над романом про женскую дружбу. А еще делиться своими лайфхаками про творческий процесс.";
     await sendDirectMessage(telegramId, m2);
     await delay(450);
-    await sendDirectMessage(telegramId, m3);
 
-    // Альбом из 3 фото (после текста). Если URL невалидны, отправим текст-заглушку
+    // Альбом из 3 фото (после первого текста). Если URL невалидны, отправим текст-заглушку
     const looksValid = ONB_IMAGES.every(u => typeof u === "string" && (u.startsWith("http://") || u.startsWith("https://")));
     if (looksValid) {
       const media = ONB_IMAGES.map(url => ({ type: "photo", media: url }));
@@ -78,7 +77,10 @@ export class OnboardingScenario {
       await sendDirectMessage(telegramId, "[Альбом с фото будет здесь]");
     }
 
-    // Кнопка после картинок
+    // Текст про гостя
+    await sendDirectMessage(telegramId, m3);
+
+    // Кнопка после описания
     await sendMessageWithButtons(telegramId, "Подробнее об оплате:", {
       inline_keyboard: [[{ text: "узнать про оплату", callback_data: "onb_to_payment" }]]
     });
@@ -108,9 +110,9 @@ export class OnboardingScenario {
     if (hasFreeDays) {
       header = `Отлично, тебе начислено ${user!.subscription_days_left} дней участия. Переходи в чат → ${CHALLENGE_JOIN_LINK}`;
     } else if (isClub) {
-      header = "Супер, теперь про оплату. Для участников сообщества «Ясность&Движентие». Участие в практие стоит ₽2900 за месяц.";
+      header = "Для участников сообщества «Ясность&Движентие». Участие в практие стоит ₽2900 за месяц.";
     } else {
-      header = "Супер, теперь про оплату. Участие в практие стоит ₽4900 за месяц. Пробная неделя — ₽745.";
+      header = "Участие в практие стоит ₽4900 за месяц. Пробная неделя — ₽745.";
     }
 
     const note = "Мы хотим чтобы практика приносила пользу. Поэтому когда вы выходите из чата и отменяете подписку, мы сохраняем все оставшиеся оплаченные дни и даём возможность использовать их в будущем.";
